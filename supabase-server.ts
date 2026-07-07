@@ -7,6 +7,14 @@ export function isSupabaseServerConfigured() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+export function isSupabaseAuthConfigured() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
+
 export function getSupabaseAdmin() {
   if (!isSupabaseServerConfigured()) return null;
 

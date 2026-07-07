@@ -135,6 +135,12 @@ Coffee-Dex/
 - 未配置 Supabase：使用本地 `data/coffee-records.json`，适合本机测试。
 - 已配置 Supabase：启用邮箱密码登录，每个用户只看到自己的咖啡记录，照片上传到 Supabase Storage。
 
+启用多人登录需要同时配置下面 3 个 Supabase 变量，少任何一个都会自动退回本地测试模式：
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
 ### 1. 创建 Supabase 项目
 
 1. 在 Supabase 新建项目。
@@ -143,6 +149,9 @@ Coffee-Dex/
    - Project URL
    - anon public key
    - service_role key
+4. 在 Authentication -> Providers -> Email 中确认 Email 登录已启用。
+   - 如果想让用户注册后立刻登录，可以关闭 Confirm email。
+   - 如果开启 Confirm email，用户注册后需要先进邮箱点确认链接。
 
 ### 2. 配置环境变量
 
@@ -160,6 +169,8 @@ SUPABASE_STORAGE_BUCKET=coffee-photos
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` 和 `OPENAI_API_KEY` 只能放在服务端环境变量里，不能写进前端代码。
+
+多人登录开启后，用户登录状态由 Supabase Auth 管理；接口会根据当前登录用户的 token 读取和保存记录，不同账号之间的数据互相隔离。
 
 ### 3. 部署到 Vercel
 

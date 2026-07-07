@@ -81,6 +81,16 @@ export default function MobilePage() {
     !recognizing && Boolean(imageData) && Boolean(recognition?.isDrink || manualConfirmed);
   const canSubmit = Boolean(canContinueAfterRecognition && selectedCoffee && Number(volumeMl) > 0 && !submitting);
 
+  useEffect(() => {
+    const resetTimer = window.setTimeout(() => {
+      setRecords([]);
+      setLastRecord(null);
+      setShowResultCard(false);
+    }, 0);
+
+    return () => window.clearTimeout(resetTimer);
+  }, [authUser?.id, isAuthEnabled]);
+
   const handlePhoto = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;

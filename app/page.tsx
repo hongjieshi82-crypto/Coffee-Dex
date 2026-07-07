@@ -153,6 +153,20 @@ export default function Home() {
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [now, records, selectedCategory, selectedSubtype, timeFilter]);
 
+  useEffect(() => {
+    initializedRef.current = false;
+    recordIdsRef.current = new Set();
+
+    const resetTimer = window.setTimeout(() => {
+      setRecords([]);
+      setDetailRecord(null);
+      setReportRecord(null);
+      setHistoryOpen(false);
+    }, 0);
+
+    return () => window.clearTimeout(resetTimer);
+  }, [authUser?.id, isAuthEnabled]);
+
   const copyMobileUrl = async () => {
     if (!mobileUrl) return;
 

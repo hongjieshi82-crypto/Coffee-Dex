@@ -92,7 +92,7 @@ export function AuthGate({ auth, surface = "pc" }: { auth: CoffeeAuth; surface?:
           </button>
         </form>
 
-        <div className="auth-gate-foot">正式上线后，手机和电脑使用同一个账号同步数据。</div>
+        <div className="auth-gate-foot">手机和电脑使用同一个账号同步数据。</div>
       </section>
     </main>
   );

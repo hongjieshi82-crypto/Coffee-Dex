@@ -8,12 +8,12 @@ import {
 } from "@/coffee-data";
 import { addRecord, deleteRecord, getRecordState } from "@/record-store";
 import { addSupabaseRecord, deleteSupabaseRecord, getSupabaseRecords } from "@/supabase-record-store";
-import { getRequestUser, isSupabaseServerConfigured } from "@/supabase-server";
+import { getRequestUser, isSupabaseAuthConfigured } from "@/supabase-server";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  if (isSupabaseServerConfigured()) {
+  if (isSupabaseAuthConfigured()) {
     const user = await getRequestUser(request);
 
     if (!user) {
@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = isSupabaseServerConfigured() ? await getRequestUser(request) : null;
+  const user = isSupabaseAuthConfigured() ? await getRequestUser(request) : null;
 
-  if (isSupabaseServerConfigured() && !user) {
+  if (isSupabaseAuthConfigured() && !user) {
     return NextResponse.json({ error: "请先登录后录入咖啡。" }, { status: 401 });
   }
 
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
 
-  if (isSupabaseServerConfigured()) {
+  if (isSupabaseAuthConfigured()) {
     const user = await getRequestUser(request);
 
     if (!user) {
