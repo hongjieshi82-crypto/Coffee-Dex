@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getLocalRequestUser } from "@/local-auth";
+import { getRequestUser, isSupabaseAuthConfigured } from "@/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -7,14 +9,17 @@ interface RecognitionResult {
   confidence: number;
   vessel: string | null;
   drinkType: string | null;
+  drinkName: string | null;
   reason: string;
   provider: "openai" | "manual";
   allowManualConfirm: boolean;
 }
 
-const recognitionPrompt = `你是 Coffee-Dex 的饮品照片审核器。
+const recognitionPrompt = `你是 Coffee-Dex 的图片饮品检测器。
 只判断图片里是否有真实可饮用饮品或杯具，例如咖啡杯、纸杯、马克杯、玻璃杯、瓶装饮料、奶茶杯、茶杯。
 如果只是菜单、截图、桌面、键盘、人物、空杯包装或没有饮品，请判定为 false。
+如果能从杯身、包装、颜色、文字或饮品外观判断具体饮品，请尽量给出最具体的中文饮品名，例如：葡萄鲜切柠檬茶、生椰拿铁、冰美式、珍珠奶茶。
+如果只能确定大类，请给出大类，例如：咖啡、奶茶、果茶、茶饮。不要编造看不出来的具体口味。
 不要识别人脸、身份、地点等隐私信息。
 只返回 JSON，不要 Markdown：
 {
@@ -22,10 +27,17 @@ const recognitionPrompt = `你是 Coffee-Dex 的饮品照片审核器。
   "confidence": number,
   "vessel": string | null, // 必须使用简体中文，例如：纸杯、玻璃杯、马克杯、奶茶杯、瓶装饮料；不要英文
   "drinkType": string | null, // 必须使用简体中文，例如：咖啡、拿铁、美式、奶茶、茶饮、饮品；不要英文
+  "drinkName": string | null, // 尽量具体的中文饮品名；无法判断时为 null
   "reason": string // 必须使用简体中文，不能出现英文短句
 }`;
 
 export async function POST(request: NextRequest) {
+  const user = isSupabaseAuthConfigured() ? await getRequestUser(request) : await getLocalRequestUser(request);
+
+  if (!user) {
+    return NextResponse.json({ error: "请先登录后使用 AI 识别。" }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => null);
   const imageData = body?.imageData;
 
@@ -39,6 +51,7 @@ export async function POST(request: NextRequest) {
       confidence: 0,
       vessel: null,
       drinkType: null,
+      drinkName: null,
       reason: "AI 识别服务未连接，当前可人工确认后继续录入。",
       provider: "manual",
       allowManualConfirm: true,
@@ -73,7 +86,7 @@ export async function POST(request: NextRequest) {
           },
         ],
         response_format: { type: "json_object" },
-        max_completion_tokens: 220,
+        max_completion_tokens: 320,
       }),
       signal: controller.signal,
     });
@@ -88,6 +101,7 @@ export async function POST(request: NextRequest) {
         confidence: 0,
         vessel: null,
         drinkType: null,
+        drinkName: null,
         reason: "AI 识别暂时不可用，已切换为人工确认。",
         provider: "manual",
         allowManualConfirm: true,
@@ -97,12 +111,15 @@ export async function POST(request: NextRequest) {
     const data = await result.json();
     const content = data.choices?.[0]?.message?.content ?? "{}";
     const parsed = parseRecognitionJson(content);
+    const drinkName = toChineseRecognitionText(parsed.drinkName, null);
+    const drinkType = toChineseRecognitionText(parsed.drinkType, null);
 
     return NextResponse.json({
       isDrink: Boolean(parsed.isDrink),
       confidence: clampConfidence(parsed.confidence),
       vessel: toChineseRecognitionText(parsed.vessel, null),
-      drinkType: toChineseRecognitionText(parsed.drinkType, null),
+      drinkType,
+      drinkName,
       reason: toChineseRecognitionText(parsed.reason, "AI 已完成识别。") ?? "AI 已完成识别。",
       provider: "openai",
       allowManualConfirm: true,
@@ -115,6 +132,7 @@ export async function POST(request: NextRequest) {
       confidence: 0,
       vessel: null,
       drinkType: null,
+      drinkName: null,
       reason: "AI 识别请求失败，已切换为人工确认。",
       provider: "manual",
       allowManualConfirm: true,

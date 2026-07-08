@@ -2,8 +2,9 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Camera, CheckCircle2, ChevronLeft, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
-import { CoffeeRecord, coffeeCategories, coffeeTypeMap, searchCoffeeTypes } from "@/coffee-data";
+import { CoffeeRecord, coffeeCategories, coffeeTypeMap, getExactCoffeeMatch, searchCoffeeTypes } from "@/coffee-data";
 import { AuthGate } from "@/app/AuthGate";
 import { useCoffeeAuth } from "@/use-coffee-auth";
 
@@ -16,11 +17,21 @@ const quickVolumes = [
   { label: "超大杯", ml: 480 },
 ];
 
+type TimeFilter = "all" | "week" | "month" | "year";
+
+const timeFilterLabels: Record<TimeFilter, string> = {
+  all: "全部",
+  week: "本周",
+  month: "本月",
+  year: "本年",
+};
+
 interface RecognitionResult {
   isDrink: boolean;
   confidence: number;
   vessel: string | null;
   drinkType: string | null;
+  drinkName: string | null;
   reason: string;
   provider: "openai" | "manual";
   allowManualConfirm: boolean;
@@ -32,6 +43,7 @@ interface RecordsResponse {
 }
 
 export default function MobilePage() {
+  const router = useRouter();
   const auth = useCoffeeAuth();
   const {
     isAuthEnabled,
@@ -56,6 +68,7 @@ export default function MobilePage() {
   const [showResultCard, setShowResultCard] = useState(false);
   const [screen, setScreen] = useState<"entry" | "home">("entry");
   const [records, setRecords] = useState<CoffeeRecord[]>([]);
+  const [surfaceChecked, setSurfaceChecked] = useState(false);
 
   const refreshRecords = useCallback(async () => {
     if (isAuthEnabled && !authUser) {
@@ -85,11 +98,29 @@ export default function MobilePage() {
   );
   const selectedCoffee = selectedTypeId ? coffeeTypeMap[selectedTypeId] : null;
   const searchMatches = useMemo(() => searchCoffeeTypes(searchTerm), [searchTerm]);
+  const recognitionApproved = Boolean(recognition?.provider === "openai" && recognition.isDrink) || manualConfirmed;
   const canContinueAfterRecognition =
-    !recognizing && Boolean(imageData) && Boolean(recognition?.isDrink || manualConfirmed);
+    !recognizing && Boolean(imageData) && recognitionApproved;
   const canSubmit = Boolean(canContinueAfterRecognition && selectedCoffee && Number(volumeMl) > 0 && !submitting);
+  const shouldShowRecognitionCard = Boolean(imageData && recognition && !recognizing);
+  const aiDetectedText = recognition ? getRecognitionDetectedText(recognition, manualConfirmed) : "";
 
   useEffect(() => {
+    const isPhoneWidth = window.matchMedia("(max-width: 760px)").matches;
+
+    if (!isPhoneWidth) {
+      router.replace("/");
+      return;
+    }
+
+    const checkTimer = window.setTimeout(() => setSurfaceChecked(true), 0);
+
+    return () => window.clearTimeout(checkTimer);
+  }, [router]);
+
+  useEffect(() => {
+    if (!surfaceChecked) return;
+
     const resetTimer = window.setTimeout(() => {
       setRecords([]);
       setLastRecord(null);
@@ -97,7 +128,7 @@ export default function MobilePage() {
     }, 0);
 
     return () => window.clearTimeout(resetTimer);
-  }, [authUser?.id, isAuthEnabled]);
+  }, [authUser?.id, isAuthEnabled, surfaceChecked]);
 
   const handlePhoto = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -106,6 +137,9 @@ export default function MobilePage() {
     setMessage("正在压缩照片...");
     const compressed = await compressImage(file);
     setImageData(compressed);
+    setSelectedCategoryId(null);
+    setSelectedTypeId(null);
+    setSearchTerm("");
     setRecognition(null);
     setManualConfirmed(false);
     setLastRecord(null);
@@ -132,6 +166,9 @@ export default function MobilePage() {
 
   const resetPhoto = () => {
     setImageData(null);
+    setSelectedCategoryId(null);
+    setSelectedTypeId(null);
+    setSearchTerm("");
     setRecognition(null);
     setManualConfirmed(false);
     setRecognizing(false);
@@ -145,17 +182,43 @@ export default function MobilePage() {
     setMessage("已自动匹配到大类和子类。");
   };
 
+  const updateSearchTerm = (value: string) => {
+    setSearchTerm(value);
+  };
+
+  const confirmSearchTerm = () => {
+    if (!canContinueAfterRecognition) return;
+
+    const trimmedTerm = searchTerm.trim();
+
+    if (!trimmedTerm) return;
+
+    const exactMatch = getExactCoffeeMatch(trimmedTerm);
+
+    if (!exactMatch) {
+      setMessage("没有精确匹配到分类，可以点下方推荐项。");
+      return;
+    }
+
+    if (selectedTypeId === exactMatch.coffee.id) return;
+
+    setSelectedCategoryId(exactMatch.category.id);
+    setSelectedTypeId(exactMatch.coffee.id);
+    setMessage("已根据输入匹配分类。");
+  };
+
   const recognizeImage = async (photoData: string) => {
     setRecognizing(true);
-    setMessage("AI 正在识别是否为饮品...");
+    setMessage("");
 
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 6_500);
 
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/recognize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ imageData: photoData }),
         signal: controller.signal,
       });
@@ -163,44 +226,34 @@ export default function MobilePage() {
       const data = (await response.json()) as RecognitionResult | { error?: string };
       const errorMessage = "error" in data ? data.error : undefined;
 
+      if (response.status === 401) {
+        setMessage(errorMessage ?? "登录状态已失效，请重新登录。");
+        void signOut();
+        return;
+      }
+
       if (!response.ok || errorMessage) {
-        setRecognition({
-          isDrink: true,
-          confidence: 0,
-          vessel: null,
-          drinkType: null,
-          reason: errorMessage ?? "AI 识别失败，已切换为人工确认。",
-          provider: "manual",
-          allowManualConfirm: true,
-        });
-        setManualConfirmed(true);
-        setMessage("AI 识别失败，已进入人工确认模式。");
+        setRecognition(createManualRecognition(errorMessage ?? "AI 识别暂时不可用，请人工确认后继续录入。"));
+        setManualConfirmed(false);
+        setMessage("");
         return;
       }
 
       const recognitionData = data as RecognitionResult;
 
+      if (recognitionData.provider === "manual") {
+        setRecognition(recognitionData);
+        setManualConfirmed(false);
+        setMessage("");
+        return;
+      }
+
       setRecognition(recognitionData);
-      setManualConfirmed(recognitionData.isDrink || recognitionData.provider === "manual");
-      setMessage(
-        recognitionData.provider === "manual"
-          ? recognitionData.reason
-          : recognitionData.isDrink
-            ? `AI 识别通过：${recognitionData.reason}`
-            : `AI 未确认这是饮品：${recognitionData.reason}`
-      );
+      setManualConfirmed(false);
     } catch {
-      setRecognition({
-        isDrink: true,
-        confidence: 0,
-        vessel: null,
-        drinkType: null,
-        reason: "AI 识别等待过久，已切换为人工确认。",
-        provider: "manual",
-        allowManualConfirm: true,
-      });
-      setManualConfirmed(true);
-      setMessage("AI 识别等待过久，已进入人工确认模式。");
+      setRecognition(createManualRecognition("AI 识别请求失败，请人工确认这张照片是否为饮品。"));
+      setManualConfirmed(false);
+      setMessage("");
     } finally {
       window.clearTimeout(timeout);
       setRecognizing(false);
@@ -244,6 +297,7 @@ export default function MobilePage() {
       setRecords((current) => [data.record, ...current.filter((record) => record.id !== data.record.id)]);
       setShowResultCard(true);
       setMessage("");
+      void refreshRecords();
     } catch {
       setMessage("网络异常，提交失败，请重试。");
     } finally {
@@ -256,6 +310,14 @@ export default function MobilePage() {
     setScreen("home");
     void refreshRecords();
   };
+
+  if (!surfaceChecked) {
+    return (
+      <main className="mobile-view">
+        <div className="m-ambient" />
+      </main>
+    );
+  }
 
   if (isAuthEnabled && (authLoading || !authUser)) {
     return <AuthGate auth={auth} surface="mobile" />;
@@ -284,6 +346,14 @@ export default function MobilePage() {
         <header className="m-header">
           <h1>Coffee-Dex</h1>
           <p className="sub">记录每一杯，点亮你的图鉴</p>
+          {isAuthEnabled && authUser?.email && (
+            <div className="m-entry-account">
+              <span>{authUser.email}</span>
+              <button type="button" onClick={signOut}>
+                退出
+              </button>
+            </div>
+          )}
         </header>
 
         <section className="m-upload-card">
@@ -318,28 +388,20 @@ export default function MobilePage() {
           <input id="mFileInput" type="file" accept="image/*" onChange={handlePhoto} />
         </section>
 
-        {imageData && recognition && (
-          <section className={`m-ai-status-card ${recognition.isDrink || manualConfirmed ? "pass" : "warn"}`}>
-            <div className="m-ai-status-title">
-              {recognition.provider === "openai" ? "AI 饮品识别" : "人工确认模式"}
-            </div>
+        {shouldShowRecognitionCard && recognition && (
+          <section className={`m-ai-status-card ${recognitionApproved ? "pass" : "warn"}`}>
+            <div className="m-ai-status-title">AI 检测</div>
             <div className="m-ai-status-text">
-              {recognition.reason}
+              {aiDetectedText}
               {recognition.confidence > 0 ? `（置信度 ${Math.round(recognition.confidence * 100)}%）` : ""}
             </div>
-            {(recognition.vessel || recognition.drinkType) && (
-              <div className="m-ai-status-tags">
-                {recognition.vessel && <span>{recognition.vessel}</span>}
-                {recognition.drinkType && <span>{recognition.drinkType}</span>}
-              </div>
-            )}
-            {!recognition.isDrink && !manualConfirmed && recognition.allowManualConfirm && (
+            {!recognitionApproved && recognition.allowManualConfirm && (
               <button
                 type="button"
                 className="m-ai-confirm-btn"
                 onClick={() => {
                   setManualConfirmed(true);
-                  setMessage("已人工确认这是饮品照片。");
+                  setMessage("已确认，继续选择饮品类型。");
                 }}
               >
                 我确认这是饮品，继续录入
@@ -349,43 +411,81 @@ export default function MobilePage() {
         )}
 
         <section className={`m-search-section ${canContinueAfterRecognition ? "show" : ""}`}>
-          <div className="m-section-title">或输入咖啡名称</div>
-          <div className="m-search-input-wrap">
-            <Search className="m-search-icon" size={16} strokeWidth={1.8} />
-            <input
-              type="text"
-              className="m-search-input"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="例如：拿铁、美式、澳白..."
-            />
-          </div>
-          <div className={`m-search-results ${searchTerm.trim() ? "show" : ""}`}>
-            {searchMatches.length ? (
-              searchMatches.map(({ category, coffee }) => (
+          {selectedCategory && selectedCoffee ? (
+            <div className="m-drink-match-card">
+              <div>
+                <span className="m-drink-match-label">已匹配分类</span>
+                <span className="m-drink-match-name">{selectedCategory.name}: {selectedCoffee.name}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategoryId(null);
+                  setSelectedTypeId(null);
+                  setSearchTerm("");
+                  setMessage("请重新输入饮品名称。");
+                }}
+              >
+                修改
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="m-section-title">输入饮品名称匹配分类</div>
+              <div className="m-search-input-wrap">
+                <Search className="m-search-icon" size={16} strokeWidth={1.8} />
+                <input
+                  type="text"
+                  className="m-search-input"
+                  value={searchTerm}
+                  onChange={(event) => updateSearchTerm(event.target.value)}
+                  onBlur={confirmSearchTerm}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      confirmSearchTerm();
+                    }
+                  }}
+                  placeholder="例如：葡萄柠檬茶、拿铁、奶茶..."
+                />
                 <button
-                  key={coffee.id}
                   type="button"
-                  className="m-search-result-item"
-                  onClick={() => quickSelect(category.id, coffee.id)}
+                  className="m-search-confirm"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={confirmSearchTerm}
+                  disabled={!searchTerm.trim()}
                 >
-                  <span className="m-search-result-mark">{coffee.name.slice(0, 2)}</span>
-                  <span className="sr-info">
-                    <span className="sr-name">{coffee.name}</span>
-                    <span className="sr-cat">
-                      {category.name} · {coffee.en}
-                    </span>
-                  </span>
-                  <span className="sr-arrow">→</span>
+                  确认
                 </button>
-              ))
-            ) : (
-              <div className="m-search-no-result">未找到匹配的咖啡，请手动选择</div>
-            )}
-          </div>
+              </div>
+              <div className={`m-search-results ${searchTerm.trim() ? "show" : ""}`}>
+                {searchMatches.length ? (
+                  searchMatches.map(({ category, coffee }) => (
+                    <button
+                      key={coffee.id}
+                      type="button"
+                      className="m-search-result-item"
+                      onClick={() => quickSelect(category.id, coffee.id)}
+                    >
+                      <span className="m-search-result-mark">{coffee.name.slice(0, 2)}</span>
+                      <span className="sr-info">
+                        <span className="sr-name">{coffee.name}</span>
+                        <span className="sr-cat">
+                          {category.name} · {coffee.en}
+                        </span>
+                      </span>
+                      <span className="sr-arrow">→</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="m-search-no-result">未找到匹配的饮品，请从下方手动选择</div>
+                )}
+              </div>
+            </>
+          )}
         </section>
 
-        <section className={`m-type-section ${canContinueAfterRecognition ? "show" : ""}`}>
+        <section className={`m-type-section ${canContinueAfterRecognition && !selectedCoffee ? "show" : ""}`}>
           <div className="m-category-row">
             {coffeeCategories.map((category) => (
               <button
@@ -407,7 +507,7 @@ export default function MobilePage() {
           </div>
         </section>
 
-        <section className={`m-type-section ${selectedCategory ? "show" : ""}`}>
+        <section className={`m-type-section ${selectedCategory && !selectedCoffee ? "show" : ""}`}>
           <div className="m-type-grid">
             {selectedCategory?.items.map((coffee) => (
               <button
@@ -536,6 +636,8 @@ function MobileHome({
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedSubtype, setSelectedSubtype] = useState("all");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [timeFilterOpen, setTimeFilterOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<CoffeeRecord | null>(null);
   const [now, setNow] = useState(0);
 
@@ -575,15 +677,24 @@ function MobileHome({
   const openCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
     setSelectedSubtype("all");
+    setTimeFilter("all");
+    setTimeFilterOpen(false);
     setSelectedRecord(null);
   };
 
   if (selectedCategory) {
-    const visibleRecords = records.filter(
+    const subtypeRecords = records.filter(
       (record) =>
         record.categoryId === selectedCategory.id &&
         (selectedSubtype === "all" || record.coffeeType === selectedSubtype)
     );
+    const visibleRecords = subtypeRecords.filter((record) => matchesTimeFilter(record, timeFilter, now));
+    const timeFilterCounts: Record<TimeFilter, number> = {
+      all: subtypeRecords.length,
+      week: subtypeRecords.filter((record) => matchesTimeFilter(record, "week", now)).length,
+      month: subtypeRecords.filter((record) => matchesTimeFilter(record, "month", now)).length,
+      year: subtypeRecords.filter((record) => matchesTimeFilter(record, "year", now)).length,
+    };
 
     return (
       <main className="mobile-view">
@@ -596,6 +707,8 @@ function MobileHome({
                 onClick={() => {
                   setSelectedCategoryId(null);
                   setSelectedSubtype("all");
+                  setTimeFilter("all");
+                  setTimeFilterOpen(false);
                   setSelectedRecord(null);
                 }}
                 aria-label="返回手机首页"
@@ -607,10 +720,34 @@ function MobileHome({
                 <div className="m-cat-detail-en">{selectedCategory.en}</div>
               </div>
               <div className="m-cat-detail-count-inline">{visibleRecords.length}杯</div>
-              <button type="button" className="m-cat-detail-filter-btn-icon" aria-label="筛选">
+              <button
+                type="button"
+                className={`m-cat-detail-filter-btn-icon ${timeFilterOpen || timeFilter !== "all" ? "active" : ""}`}
+                onClick={() => setTimeFilterOpen((open) => !open)}
+                aria-label="筛选"
+                aria-expanded={timeFilterOpen}
+              >
                 <SlidersHorizontal size={18} />
               </button>
             </div>
+            {timeFilterOpen && (
+              <div className="m-cat-detail-time-filter" aria-label="时间筛选">
+                {(Object.entries(timeFilterLabels) as Array<[TimeFilter, string]>).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`m-cat-detail-time-option ${timeFilter === id ? "active" : ""}`}
+                    onClick={() => {
+                      setTimeFilter(id);
+                      setTimeFilterOpen(false);
+                    }}
+                  >
+                    <span>{label}</span>
+                    <span>{timeFilterCounts[id]}杯</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="m-cat-detail-subtabs">
               <SubtypeTab active={selectedSubtype === "all"} onClick={() => setSelectedSubtype("all")}>
                 全部
@@ -838,6 +975,66 @@ function ResultCard({
       </section>
     </div>
   );
+}
+
+function createManualRecognition(reason: string): RecognitionResult {
+  return {
+    isDrink: false,
+    confidence: 0,
+    vessel: null,
+    drinkType: null,
+    drinkName: null,
+    reason,
+    provider: "manual",
+    allowManualConfirm: true,
+  };
+}
+
+function getRecognitionDetectedText(recognition: RecognitionResult, manualConfirmed: boolean) {
+  if (manualConfirmed) {
+    return "已人工确认这张照片里是饮品。";
+  }
+
+  if (recognition.provider === "manual") {
+    return recognition.reason;
+  }
+
+  const detected = [recognition.vessel, recognition.drinkName, recognition.drinkType]
+    .filter((value): value is string => Boolean(value))
+    .filter((value, index, values) => values.indexOf(value) === index);
+
+  if (recognition.isDrink) {
+    return detected.length ? `AI 检测到图片里有：${detected.join("、")}。` : "AI 检测到图片里有可饮用饮品。";
+  }
+
+  return detected.length ? `AI 检测到图片里有：${detected.join("、")}，但未确认是饮品。` : recognition.reason;
+}
+
+function matchesTimeFilter(record: CoffeeRecord, filter: TimeFilter, now: number) {
+  if (!now) return true;
+  if (filter === "week") return record.timestamp >= getWeekStart(now);
+  if (filter === "month") return record.timestamp >= getMonthStart(now);
+  if (filter === "year") return record.timestamp >= getYearStart(now);
+  return true;
+}
+
+function getWeekStart(timestamp: number) {
+  const date = new Date(timestamp);
+  const dayOfWeek = date.getDay() || 7;
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate() - dayOfWeek + 1);
+  start.setHours(0, 0, 0, 0);
+
+  return start.getTime();
+}
+
+function getMonthStart(timestamp: number) {
+  const date = new Date(timestamp);
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+
+function getYearStart(timestamp: number) {
+  const date = new Date(timestamp);
+  return new Date(date.getFullYear(), 0, 1).getTime();
 }
 
 function formatDateTime(timestamp: number) {

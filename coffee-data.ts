@@ -47,6 +47,10 @@ export const coffeeCategories: CoffeeCategory[] = [
       { id: "cortado", name: "可塔朵", en: "Cortado", gradient: ["#a16207", "#78350f"] },
       { id: "macchiato", name: "玛奇朵", en: "Macchiato", gradient: ["#d4a373", "#6b4226"] },
       { id: "ristretto", name: "精萃", en: "Ristretto", gradient: ["#1c1917", "#0a0a0a"] },
+      { id: "long-black", name: "长黑", en: "Long Black", gradient: ["#451a03", "#0a0a0a"] },
+      { id: "lungo", name: "加长浓缩", en: "Lungo", gradient: ["#57534e", "#1c1917"] },
+      { id: "piccolo", name: "短笛咖啡", en: "Piccolo", gradient: ["#d97706", "#78350f"] },
+      { id: "breve", name: "布雷卫", en: "Breve", gradient: ["#f5d0a9", "#92400e"] },
     ]),
   },
   {
@@ -61,6 +65,11 @@ export const coffeeCategories: CoffeeCategory[] = [
       { id: "affogato", name: "阿芙佳朵", en: "Affogato", gradient: ["#fde68a", "#92400e"] },
       { id: "osmanthus-latte", name: "桂花拿铁", en: "Osmanthus Latte", gradient: ["#fbbf24", "#b45309"] },
       { id: "coconut-latte", name: "生椰拿铁", en: "Coconut Latte", gradient: ["#e2e8f0", "#94a3b8"] },
+      { id: "spanish-latte", name: "西班牙拿铁", en: "Spanish Latte", gradient: ["#f59e0b", "#7c2d12"] },
+      { id: "sea-salt-latte", name: "海盐拿铁", en: "Sea Salt Latte", gradient: ["#93c5fd", "#92400e"] },
+      { id: "pistachio-latte", name: "开心果拿铁", en: "Pistachio Latte", gradient: ["#84cc16", "#3f6212"] },
+      { id: "rose-latte", name: "玫瑰拿铁", en: "Rose Latte", gradient: ["#fb7185", "#9f1239"] },
+      { id: "toffee-nut-latte", name: "太妃榛果拿铁", en: "Toffee Nut Latte", gradient: ["#fbbf24", "#78350f"] },
     ]),
   },
   {
@@ -74,6 +83,11 @@ export const coffeeCategories: CoffeeCategory[] = [
       { id: "panama-geisha", name: "巴拿马瑰夏", en: "Panama Geisha", gradient: ["#b45309", "#78350f"] },
       { id: "mandheling", name: "曼特宁", en: "Mandheling", gradient: ["#365314", "#1a2e05"] },
       { id: "brazil", name: "巴西", en: "Brazil", gradient: ["#166534", "#052e16"] },
+      { id: "ethiopia", name: "埃塞俄比亚", en: "Ethiopia", gradient: ["#7c2d12", "#312e81"] },
+      { id: "guatemala", name: "危地马拉", en: "Guatemala", gradient: ["#854d0e", "#365314"] },
+      { id: "costa-rica", name: "哥斯达黎加", en: "Costa Rica", gradient: ["#b91c1c", "#0f766e"] },
+      { id: "honduras", name: "洪都拉斯", en: "Honduras", gradient: ["#1d4ed8", "#451a03"] },
+      { id: "rwanda", name: "卢旺达", en: "Rwanda", gradient: ["#be123c", "#4c1d95"] },
     ]),
   },
   {
@@ -87,6 +101,11 @@ export const coffeeCategories: CoffeeCategory[] = [
       { id: "iced-latte", name: "冰拿铁", en: "Iced Latte", gradient: ["#93c5fd", "#2563eb"] },
       { id: "frappuccino", name: "星冰乐", en: "Frappuccino", gradient: ["#c084fc", "#7c3aed"] },
       { id: "lemon-coffee", name: "冻柠咖啡", en: "Lemon Coffee", gradient: ["#fde047", "#ca8a04"] },
+      { id: "iced-oat-latte", name: "冰燕麦拿铁", en: "Iced Oat Latte", gradient: ["#bae6fd", "#a16207"] },
+      { id: "iced-spanish-latte", name: "冰西班牙拿铁", en: "Iced Spanish Latte", gradient: ["#38bdf8", "#b45309"] },
+      { id: "cold-brew-latte", name: "冷萃拿铁", en: "Cold Brew Latte", gradient: ["#0f766e", "#92400e"] },
+      { id: "iced-mocha", name: "冰摩卡", en: "Iced Mocha", gradient: ["#60a5fa", "#581c87"] },
+      { id: "shakerato", name: "冰摇浓缩", en: "Shakerato", gradient: ["#334155", "#0f172a"] },
     ]),
   },
   {
@@ -101,6 +120,37 @@ export const coffeeCategories: CoffeeCategory[] = [
       { id: "oat-latte", name: "燕麦拿铁", en: "Oat Latte", gradient: ["#d4a373", "#a16207"] },
       { id: "sparkling-americano", name: "气泡美式", en: "Sparkling Americano", gradient: ["#67e8f9", "#0891b2"] },
       { id: "plum-americano", name: "话梅美式", en: "Plum Americano", gradient: ["#c084fc", "#7c3aed"] },
+      { id: "espresso-tonic", name: "汤力咖啡", en: "Espresso Tonic", gradient: ["#67e8f9", "#451a03"] },
+      { id: "yuzu-americano", name: "柚子美式", en: "Yuzu Americano", gradient: ["#facc15", "#0f766e"] },
+      { id: "osmanthus-americano", name: "桂花美式", en: "Osmanthus Americano", gradient: ["#fbbf24", "#78350f"] },
+      { id: "pineapple-americano", name: "菠萝美式", en: "Pineapple Americano", gradient: ["#fde047", "#16a34a"] },
+      { id: "mint-mocha", name: "薄荷摩卡", en: "Mint Mocha", gradient: ["#2dd4bf", "#451a03"] },
+    ]),
+  },
+  {
+    id: "milk-tea",
+    name: "奶茶鲜奶",
+    en: "Milk Tea",
+    items: withCategory("milk-tea", [
+      { id: "classic-milk-tea", name: "经典奶茶", en: "Classic Milk Tea", gradient: ["#b45309", "#78350f"] },
+      { id: "bubble-milk-tea", name: "珍珠奶茶", en: "Bubble Milk Tea", gradient: ["#92400e", "#451a03"] },
+      { id: "jasmine-milk-tea", name: "茉莉奶绿", en: "Jasmine Milk Green", gradient: ["#65a30d", "#14532d"] },
+      { id: "oolong-milk-tea", name: "乌龙奶茶", en: "Oolong Milk Tea", gradient: ["#a16207", "#3f2a14"] },
+      { id: "cheese-tea", name: "芝士茶", en: "Cheese Tea", gradient: ["#facc15", "#b45309"] },
+      { id: "brown-sugar-milk", name: "黑糖鲜奶", en: "Brown Sugar Milk", gradient: ["#854d0e", "#1c1917"] },
+    ]),
+  },
+  {
+    id: "fruit-tea",
+    name: "果茶清爽",
+    en: "Fruit Tea",
+    items: withCategory("fruit-tea", [
+      { id: "fresh-lemon-tea", name: "鲜切柠檬茶", en: "Fresh Lemon Tea", gradient: ["#facc15", "#65a30d"] },
+      { id: "grape-lemon-tea", name: "葡萄鲜切柠檬茶", en: "Grape Lemon Tea", gradient: ["#7c3aed", "#84cc16"] },
+      { id: "fresh-fruit-tea", name: "满杯水果茶", en: "Fresh Fruit Tea", gradient: ["#f97316", "#dc2626"] },
+      { id: "passionfruit-tea", name: "百香果茶", en: "Passion Fruit Tea", gradient: ["#fde047", "#f97316"] },
+      { id: "peach-oolong", name: "白桃乌龙", en: "Peach Oolong", gradient: ["#fb7185", "#a16207"] },
+      { id: "cheese-grape", name: "芝士葡萄", en: "Cheese Grape", gradient: ["#9333ea", "#facc15"] },
     ]),
   },
   {
@@ -130,27 +180,80 @@ export interface CoffeeSearchMatch {
 const coffeeAliases: Record<string, string[]> = {
   americano: ["美式咖啡", "黑咖啡", "小黄油美式", "黄油美式", "奶油美式", "青提美式", "茉莉美式"],
   "iced-americano": ["冰美", "冰美式咖啡"],
+  "long-black": ["澳式黑咖啡", "长黑咖啡", "longblack"],
+  lungo: ["加长萃取", "加长浓缩咖啡"],
+  piccolo: ["短笛", "短笛拿铁", "piccolo latte"],
+  breve: ["半奶油拿铁", "布雷夫"],
   latte: ["拿铁咖啡", "latte"],
   "flat-white": ["澳瑞白", "馥芮白", "flatwhite"],
   cappuccino: ["卡布", "卡布基诺"],
   macchiato: ["玛琪朵", "玛奇雅朵"],
   "caramel-macchiato": ["焦玛", "焦糖玛琪朵"],
+  "spanish-latte": ["西班牙拿铁咖啡", "炼乳拿铁"],
+  "sea-salt-latte": ["海盐咖啡", "海盐奶咖"],
+  "pistachio-latte": ["开心果咖啡", "开心果奶咖"],
+  "rose-latte": ["玫瑰咖啡", "玫瑰奶咖"],
+  "toffee-nut-latte": ["太妃拿铁", "太妃榛果", "榛果太妃拿铁"],
+  ethiopia: ["埃塞", "埃塞豆", "埃塞俄比亚咖啡"],
+  guatemala: ["危地马拉咖啡", "危地马拉豆"],
+  "costa-rica": ["哥斯达黎加咖啡", "哥斯达黎加豆"],
+  honduras: ["洪都拉斯咖啡", "洪都拉斯豆"],
+  rwanda: ["卢旺达咖啡", "卢旺达豆"],
   "cold-brew": ["冷泡", "冷萃咖啡"],
+  "iced-oat-latte": ["冰燕麦", "冰燕麦奶拿铁"],
+  "iced-spanish-latte": ["冰西班牙", "冰炼乳拿铁"],
+  "cold-brew-latte": ["冷萃奶咖", "冷萃拿铁咖啡"],
+  "iced-mocha": ["冰摩卡咖啡"],
+  shakerato: ["冰摇咖啡", "冰摇浓缩咖啡"],
   dirty: ["脏咖啡", "脏脏"],
   "coconut-latte": ["生椰", "生椰拿铁咖啡"],
   "orange-americano": ["橙美式", "橙c美式"],
+  "espresso-tonic": ["咖啡汤力", "浓缩汤力", "气泡汤力咖啡"],
+  "yuzu-americano": ["柚子咖啡", "柚子冰美式"],
+  "osmanthus-americano": ["桂花咖啡", "桂花冰美式"],
+  "pineapple-americano": ["菠萝咖啡", "凤梨美式"],
+  "mint-mocha": ["薄荷咖啡", "薄荷巧克力咖啡"],
   "oat-latte": ["燕麦奶拿铁"],
   "matcha-latte": ["抹茶", "抹茶拿铁咖啡"],
   cocoa: ["热可可", "巧克力"],
   "black-tea-latte": ["红茶拿铁", "鸳鸯"],
   "chai-latte": ["印度奶茶", "香料奶茶"],
   "earl-grey": ["伯爵", "伯爵红茶"],
+  "classic-milk-tea": ["奶茶", "原味奶茶", "港式奶茶"],
+  "bubble-milk-tea": ["珍奶", "波霸奶茶", "珍珠"],
+  "jasmine-milk-tea": ["奶绿", "茉莉奶茶", "茉香奶绿"],
+  "oolong-milk-tea": ["乌龙拿铁", "乌龙鲜奶茶", "乌龙奶"],
+  "cheese-tea": ["奶盖茶", "芝士奶盖", "芝士茗茶"],
+  "brown-sugar-milk": ["黑糖珍珠鲜奶", "黑糖牛奶", "黑糖波霸鲜奶"],
+  "fresh-lemon-tea": ["柠檬茶", "鲜柠茶", "手打柠檬茶", "鸭屎香柠檬茶", "香水柠檬茶"],
+  "grape-lemon-tea": ["葡萄柠檬茶", "葡萄鲜切", "鲜切葡萄柠檬茶", "葡萄鲜切柠檬茶"],
+  "fresh-fruit-tea": ["水果茶", "鲜果茶", "满杯水果", "鲜切水果茶"],
+  "passionfruit-tea": ["百香果", "百香果柠檬茶", "百香果绿茶"],
+  "peach-oolong": ["白桃乌龙茶", "蜜桃乌龙", "桃桃乌龙"],
+  "cheese-grape": ["多肉葡萄", "芝士多肉葡萄", "葡萄奶盖"],
 };
 
-const coffeeFamilies: Array<{ keywords: string[]; ids: string[] }> = [
+interface CoffeeFamily {
+  keywords: string[];
+  ids: string[];
+  generic?: boolean;
+  scoreBase?: number;
+}
+
+const coffeeFamilies: CoffeeFamily[] = [
   {
     keywords: ["美式", "americano", "黑咖啡"],
-    ids: ["americano", "iced-americano", "orange-americano", "sparkling-americano", "plum-americano"],
+    ids: [
+      "americano",
+      "iced-americano",
+      "long-black",
+      "orange-americano",
+      "sparkling-americano",
+      "plum-americano",
+      "yuzu-americano",
+      "osmanthus-americano",
+      "pineapple-americano",
+    ],
   },
   {
     keywords: ["拿铁", "latte"],
@@ -161,7 +264,15 @@ const coffeeFamilies: Array<{ keywords: string[]; ids: string[] }> = [
       "osmanthus-latte",
       "coconut-latte",
       "iced-latte",
+      "spanish-latte",
+      "sea-salt-latte",
+      "pistachio-latte",
+      "rose-latte",
+      "toffee-nut-latte",
       "oat-latte",
+      "iced-oat-latte",
+      "iced-spanish-latte",
+      "cold-brew-latte",
       "matcha-latte",
       "black-tea-latte",
       "chai-latte",
@@ -173,19 +284,55 @@ const coffeeFamilies: Array<{ keywords: string[]; ids: string[] }> = [
   },
   {
     keywords: ["冷萃", "冷泡", "coldbrew"],
-    ids: ["cold-brew", "nitro-coffee"],
+    ids: ["cold-brew", "cold-brew-latte", "nitro-coffee"],
   },
   {
     keywords: ["摩卡", "mocha", "巧克力"],
-    ids: ["mocha", "cocoa"],
+    ids: ["mocha", "iced-mocha", "mint-mocha", "cocoa"],
   },
   {
     keywords: ["椰", "coconut"],
     ids: ["coconut-latte", "coconut-coffee"],
   },
   {
+    keywords: ["手冲", "单品", "豆", "瑰夏", "ethiopia", "geisha"],
+    ids: ["yirgacheffe", "ethiopia", "panama-geisha", "colombia", "kenya", "guatemala", "costa-rica"],
+  },
+  {
+    keywords: ["抹茶", "matcha"],
+    ids: ["matcha-latte"],
+  },
+  {
+    keywords: ["奶茶", "珍珠", "奶绿", "鲜奶", "milk tea"],
+    ids: ["classic-milk-tea", "bubble-milk-tea", "jasmine-milk-tea", "oolong-milk-tea", "brown-sugar-milk"],
+  },
+  {
+    keywords: ["柠檬", "鲜切", "lemon"],
+    ids: ["fresh-lemon-tea", "grape-lemon-tea", "passionfruit-tea", "fresh-fruit-tea"],
+  },
+  {
+    keywords: ["葡萄", "grape"],
+    ids: ["grape-lemon-tea", "cheese-grape", "fresh-fruit-tea"],
+  },
+  {
+    keywords: ["水果", "果茶", "鲜果", "fruit"],
+    ids: ["fresh-fruit-tea", "passionfruit-tea", "grape-lemon-tea", "peach-oolong"],
+  },
+  {
     keywords: ["茶", "tea"],
-    ids: ["matcha-latte", "black-tea-latte", "chai-latte", "earl-grey", "herbal"],
+    ids: [
+      "fresh-lemon-tea",
+      "fresh-fruit-tea",
+      "peach-oolong",
+      "earl-grey",
+      "jasmine-milk-tea",
+      "matcha-latte",
+      "black-tea-latte",
+      "chai-latte",
+      "herbal",
+    ],
+    generic: true,
+    scoreBase: 6,
   },
 ];
 
@@ -220,16 +367,20 @@ export function searchCoffeeTypes(term: string, limit = 8): CoffeeSearchMatch[] 
     }
   }
 
-  for (const family of coffeeFamilies) {
-    const familyHit = family.keywords.map(normalizeCoffeeQuery).some((keyword) => query.includes(keyword));
+  const matchedFamilies = coffeeFamilies.map((family) => ({
+    family,
+    hit: family.keywords.map(normalizeCoffeeQuery).some((keyword) => query.includes(keyword)),
+  }));
+  const hasSpecificFamilyHit = matchedFamilies.some(({ family, hit }) => hit && !family.generic);
 
-    if (!familyHit) continue;
+  for (const { family, hit } of matchedFamilies) {
+    if (!hit || (family.generic && hasSpecificFamilyHit)) continue;
 
     family.ids.forEach((id, index) => {
       const item = categoryByCoffeeId.get(id);
 
       if (item) {
-        addMatch(item.category, item.coffee, 3 + index / 10);
+        addMatch(item.category, item.coffee, (family.scoreBase ?? 3) + index / 10);
       }
     });
   }
@@ -238,6 +389,24 @@ export function searchCoffeeTypes(term: string, limit = 8): CoffeeSearchMatch[] 
     .sort((a, b) => a.score - b.score || a.coffee.name.length - b.coffee.name.length)
     .slice(0, limit)
     .map(({ category, coffee }) => ({ category, coffee }));
+}
+
+export function getExactCoffeeMatch(term: string): CoffeeSearchMatch | null {
+  const query = normalizeCoffeeQuery(term);
+
+  if (!query) return null;
+
+  for (const category of coffeeCategories) {
+    for (const coffee of category.items) {
+      const fields = [coffee.name, coffee.en, coffee.id, ...(coffeeAliases[coffee.id] ?? [])].map(normalizeCoffeeQuery);
+
+      if (fields.some((field) => field === query)) {
+        return { category, coffee };
+      }
+    }
+  }
+
+  return null;
 }
 
 function normalizeCoffeeQuery(value: string) {
@@ -262,6 +431,10 @@ export const caffeinePer100ml: Record<string, number> = {
   cortado: 50,
   macchiato: 55,
   ristretto: 110,
+  "long-black": 45,
+  lungo: 70,
+  piccolo: 42,
+  breve: 32,
   "vanilla-latte": 28,
   "caramel-macchiato": 32,
   mocha: 25,
@@ -269,18 +442,33 @@ export const caffeinePer100ml: Record<string, number> = {
   affogato: 20,
   "osmanthus-latte": 28,
   "coconut-latte": 25,
+  "spanish-latte": 30,
+  "sea-salt-latte": 28,
+  "pistachio-latte": 26,
+  "rose-latte": 28,
+  "toffee-nut-latte": 28,
   yirgacheffe: 35,
   colombia: 38,
   kenya: 40,
   "panama-geisha": 30,
   mandheling: 42,
   brazil: 35,
+  ethiopia: 36,
+  guatemala: 38,
+  "costa-rica": 36,
+  honduras: 35,
+  rwanda: 37,
   "iced-americano": 45,
   "cold-brew": 25,
   "nitro-coffee": 30,
   "iced-latte": 30,
   frappuccino: 15,
   "lemon-coffee": 35,
+  "iced-oat-latte": 28,
+  "iced-spanish-latte": 30,
+  "cold-brew-latte": 24,
+  "iced-mocha": 24,
+  shakerato: 80,
   dirty: 45,
   "coconut-coffee": 20,
   "orange-americano": 35,
@@ -288,12 +476,29 @@ export const caffeinePer100ml: Record<string, number> = {
   "oat-latte": 28,
   "sparkling-americano": 35,
   "plum-americano": 30,
+  "espresso-tonic": 42,
+  "yuzu-americano": 35,
+  "osmanthus-americano": 35,
+  "pineapple-americano": 35,
+  "mint-mocha": 24,
   "matcha-latte": 15,
   cocoa: 10,
   "black-tea-latte": 12,
   herbal: 0,
   "chai-latte": 10,
   "earl-grey": 8,
+  "classic-milk-tea": 18,
+  "bubble-milk-tea": 16,
+  "jasmine-milk-tea": 14,
+  "oolong-milk-tea": 18,
+  "cheese-tea": 12,
+  "brown-sugar-milk": 0,
+  "fresh-lemon-tea": 8,
+  "grape-lemon-tea": 6,
+  "fresh-fruit-tea": 5,
+  "passionfruit-tea": 6,
+  "peach-oolong": 8,
+  "cheese-grape": 6,
 };
 
 export const aiComments: Record<string, string> = {
@@ -305,6 +510,10 @@ export const aiComments: Record<string, string> = {
   cortado: "可塔朵，浓缩配一小口奶。像你开工资后短暂的快乐。",
   macchiato: "玛奇朵，甜头只有一点点，苦才是主旋律。",
   ristretto: "精萃，比普通浓缩还浓。像你在 deadline 前浓缩的焦虑。",
+  "long-black": "长黑，水和浓缩各退一步，像你和需求方的暂时和解。",
+  lungo: "加长浓缩，萃取时间变长，像会开着开着就多了三项待办。",
+  piccolo: "短笛咖啡，小杯也有存在感，像一句轻飘飘但要命的改一下。",
+  breve: "布雷卫，奶油感很足，现实感也很足。",
   "vanilla-latte": "香草拿铁，甜蜜如画的饼。喝完继续搬砖。",
   "caramel-macchiato": "焦糖玛奇朵，甜到忘记 KPI。短暂快乐像周五四点半。",
   mocha: "巧克力加咖啡，甜苦交织。像极了你周一早晨的心情。",
@@ -312,18 +521,33 @@ export const aiComments: Record<string, string> = {
   affogato: "阿芙佳朵，冰淇淋浇浓缩。像用年终奖还花呗，甜蜜又心酸。",
   "osmanthus-latte": "桂花拿铁，花香盖过咖味。像你在工位上喷香水假装不在加班。",
   "coconut-latte": "生椰拿铁，打工人唯一的东南亚度假平替。",
+  "spanish-latte": "西班牙拿铁，炼乳很甜，像你对今天还抱有一丝误会。",
+  "sea-salt-latte": "海盐拿铁，咸甜交替，像工作里刚安慰完又被催。",
+  "pistachio-latte": "开心果拿铁，听起来很开心，喝完还是要回消息。",
+  "rose-latte": "玫瑰拿铁，香气很浪漫，工位很现实。",
+  "toffee-nut-latte": "太妃榛果拿铁，甜得有层次，加班也有层次。",
   yirgacheffe: "耶加雪菲，花果香里找 bug。喝这杯的人觉得自己比产品经理懂生活。",
   colombia: "哥伦比亚单品，比你的职业规划还醇苦。",
   kenya: "肯尼亚咖啡，酸度拉满。像你看到同事升职时的心情。",
   "panama-geisha": "瑰夏一杯，钱包瘦十斤。喝的不是咖啡，是身份焦虑。",
   mandheling: "曼特宁，草本药草味。像一杯能治周一综合症的苦口良药。",
   brazil: "巴西单品，打工人的日常口粮，踏实得像你的工位。",
+  ethiopia: "埃塞俄比亚，花果香很亮，像你下班前突然出现的自由幻觉。",
+  guatemala: "危地马拉，坚果可可调，适合把复杂心情喝得更具体。",
+  "costa-rica": "哥斯达黎加，干净又甜，像一份没有返工的需求。",
+  honduras: "洪都拉斯，平衡得体，像你在会上努力维持的表情。",
+  rwanda: "卢旺达，酸甜清楚，像今天每个锅的来源一样清楚。",
   "iced-americano": "冰美式，打工人的续命冰水。越冰越清醒，越清醒越想打开请假日历。",
   "cold-brew": "低温慢萃十二小时，就像你等年终奖的耐心。",
   "nitro-coffee": "氮气咖啡，绵密如你的画饼能力。看起来高级，喝起来上头。",
   "iced-latte": "冰拿铁，夏天的职场安慰剂。暂时忘记 deadline。",
   frappuccino: "星冰乐，冰沙里掺了点咖啡。像你在工作中掺了点摸鱼。",
   "lemon-coffee": "冻柠咖啡，酸甜苦的混合体。像你对公司的感情。",
+  "iced-oat-latte": "冰燕麦拿铁，健康人设在线，待办列表也在线。",
+  "iced-spanish-latte": "冰西班牙拿铁，甜得很会营业，像你回收到时的语气。",
+  "cold-brew-latte": "冷萃拿铁，温柔里带后劲，像下午三点后的需求提醒。",
+  "iced-mocha": "冰摩卡，巧克力负责甜，咖啡负责让你面对现实。",
+  shakerato: "冰摇浓缩，摇出来的是泡沫，也是你今天最后一点耐心。",
   dirty: "脏脏咖啡，像你桌面上三个月没整理的文件。但味道确实上头。",
   "coconut-coffee": "椰子水咖啡，清爽得像离职申请通过的那一秒。",
   "orange-americano": "橙子美式，酸得很阳光。像你把想下班包装成积极营业。",
@@ -331,12 +555,29 @@ export const aiComments: Record<string, string> = {
   "oat-latte": "燕麦拿铁，健康人设立起来了，夜宵照吃不误。",
   "sparkling-americano": "气泡美式，连咖啡都开始内卷口感了。",
   "plum-americano": "话梅美式，酸甜咸苦都有，像你一天的工作情绪。",
+  "espresso-tonic": "汤力咖啡，气泡很清醒，像突然被拉进会的那一秒。",
+  "yuzu-americano": "柚子美式，清爽是真的，想下班也是真的。",
+  "osmanthus-americano": "桂花美式，香得很克制，像你没有发出去的吐槽。",
+  "pineapple-americano": "菠萝美式，热带感很足，工位感也没少。",
+  "mint-mocha": "薄荷摩卡，凉意和甜意都有，现实负责补上苦味。",
   "matcha-latte": "抹茶拿铁，不是咖啡但很懂装忙。",
   cocoa: "可可，成年人偶尔也需要假装自己还有童年。",
   "black-tea-latte": "红茶拿铁，咖啡因换个马甲继续支配你。",
   herbal: "草本饮品，零咖啡因，但焦虑不减半。",
   "chai-latte": "印度奶茶，香料够多，足以盖住今天的班味。",
   "earl-grey": "伯爵茶，优雅地清醒，体面地加班。",
+  "classic-milk-tea": "经典奶茶，甜度给了安慰，工作量没有。",
+  "bubble-milk-tea": "珍珠奶茶，嚼的是珍珠，咽下去的是今天的耐心。",
+  "jasmine-milk-tea": "茉莉奶绿，香气很清新，打工状态很陈旧。",
+  "oolong-milk-tea": "乌龙奶茶，茶感在线，脑子也勉强在线。",
+  "cheese-tea": "芝士茶，奶盖很厚，像你给情绪盖上的那层体面。",
+  "brown-sugar-milk": "黑糖鲜奶，甜得很认真，现实依然不放糖。",
+  "fresh-lemon-tea": "鲜切柠檬茶，酸得清醒，像刚看完新的需求变更。",
+  "grape-lemon-tea": "葡萄鲜切柠檬茶，果香很足，足以短暂盖住班味。",
+  "fresh-fruit-tea": "满杯水果茶，颜色很努力，像你今天的积极营业。",
+  "passionfruit-tea": "百香果茶，酸甜一起上班，情绪也一起打卡。",
+  "peach-oolong": "白桃乌龙，闻起来像周末，喝完还是周中。",
+  "cheese-grape": "芝士葡萄，快乐很浓，工位距离自由依然很远。",
 };
 
 const baseToxicQuotes = [

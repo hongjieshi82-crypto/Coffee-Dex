@@ -29,10 +29,12 @@ export async function GET(request: NextRequest) {
   const protocol = isLocalNetwork ? "http" : forwardedProto ?? "https";
   const port = host.split(":")[1];
   const portPart = isLocalNetwork && port ? `:${port}` : "";
+  const shareUrl = `${protocol}://${reachableHost}${portPart}`;
 
   return NextResponse.json({
     host,
     lanIps,
-    mobileUrl: `${protocol}://${reachableHost}${portPart}/mobile`,
+    shareUrl,
+    mobileUrl: `${shareUrl}/mobile`,
   });
 }

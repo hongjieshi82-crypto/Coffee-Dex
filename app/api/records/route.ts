@@ -9,6 +9,7 @@ import {
 import { addRecord, deleteRecord, getRecordState } from "@/record-store";
 import { addSupabaseRecord, deleteSupabaseRecord, getSupabaseRecords } from "@/supabase-record-store";
 import { getRequestUser, isSupabaseAuthConfigured } from "@/supabase-server";
+import { getLocalRequestUser } from "@/local-auth";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const store = await getRecordState();
+  const user = await getLocalRequestUser(request);
+
+  if (!user) {
+    return NextResponse.json({ error: "请先登录后查看咖啡图鉴。", records: [] }, { status: 401 });
+  }
+
+  const store = await getRecordState(user.id);
 
   return NextResponse.json({
     records: store.records,
@@ -43,9 +50,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = isSupabaseAuthConfigured() ? await getRequestUser(request) : null;
+  const supabaseAuthEnabled = isSupabaseAuthConfigured();
+  const user = supabaseAuthEnabled ? await getRequestUser(request) : await getLocalRequestUser(request);
 
-  if (isSupabaseAuthConfigured() && !user) {
+  if (!user) {
     return NextResponse.json({ error: "请先登录后录入咖啡。" }, { status: 401 });
   }
 
@@ -83,7 +91,7 @@ export async function POST(request: NextRequest) {
     timestamp,
   };
 
-  if (user) {
+  if (supabaseAuthEnabled) {
     try {
       const onlineRecord = await addSupabaseRecord(user.id, record);
 
@@ -95,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const store = await addRecord(record);
+  const store = await addRecord(record, user.id);
 
   return NextResponse.json({ record, updatedAt: store.updatedAt }, { status: 201 });
 }
@@ -121,7 +129,13 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  const store = await deleteRecord(id);
+  const user = await getLocalRequestUser(request);
+
+  if (!user) {
+    return NextResponse.json({ error: "请先登录后删除记录。" }, { status: 401 });
+  }
+
+  const store = await deleteRecord(id, user.id);
 
   return NextResponse.json({ records: store.records, updatedAt: store.updatedAt });
 }

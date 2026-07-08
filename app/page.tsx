@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import QRCode from "qrcode";
 import {
   ArrowLeft,
   BookOpen,
@@ -10,6 +11,7 @@ import {
   Coffee,
   Filter,
   QrCode,
+  RefreshCw,
   Smartphone,
   X,
 } from "lucide-react";
@@ -28,6 +30,7 @@ interface RecordsResponse {
 }
 
 interface NetworkResponse {
+  shareUrl?: string;
   mobileUrl: string;
   lanIps: string[];
 }
@@ -53,8 +56,8 @@ export default function Home() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedSubtype, setSelectedSubtype] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [mobileUrl, setMobileUrl] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(0);
   const [detailRecord, setDetailRecord] = useState<CoffeeRecord | null>(null);
@@ -94,9 +97,7 @@ export default function Home() {
   }, [authUser, getAuthHeaders, isAuthEnabled, signOut]);
 
   useEffect(() => {
-    const shouldOpenMobile =
-      window.matchMedia("(max-width: 760px)").matches ||
-      /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent);
+    const shouldOpenMobile = window.matchMedia("(max-width: 760px)").matches;
 
     if (shouldOpenMobile) {
       router.replace("/mobile");
@@ -116,6 +117,24 @@ export default function Home() {
   }, [authLoading, authUser, isAuthEnabled, refreshRecords]);
 
   useEffect(() => {
+    if (isAuthEnabled && (authLoading || !authUser)) return;
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refreshRecords();
+      }
+    };
+
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+
+    return () => {
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [authLoading, authUser, isAuthEnabled, refreshRecords]);
+
+  useEffect(() => {
     const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
     const interval = window.setInterval(() => setNow(Date.now()), 60_000);
 
@@ -128,9 +147,37 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/network", { cache: "no-store" })
       .then((response) => response.json())
-      .then((data: NetworkResponse) => setMobileUrl(data.mobileUrl))
-      .catch(() => setMobileUrl(`${window.location.origin}/mobile`));
+      .then((data: NetworkResponse) => setShareUrl(data.shareUrl ?? data.mobileUrl))
+      .catch(() => setShareUrl(window.location.origin));
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!shareUrl) {
+      return;
+    }
+
+    QRCode.toDataURL(shareUrl, {
+      width: 180,
+      margin: 2,
+      errorCorrectionLevel: "M",
+      color: {
+        dark: "#1a1612",
+        light: "#ffffff",
+      },
+    })
+      .then((dataUrl) => {
+        if (active) setQrDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (active) setQrDataUrl("");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [shareUrl]);
 
   const selectedCategory = useMemo(
     () => coffeeCategories.find((category) => category.id === selectedCategoryId) ?? null,
@@ -174,10 +221,10 @@ export default function Home() {
     return () => window.clearTimeout(resetTimer);
   }, [authUser?.id, isAuthEnabled]);
 
-  const copyMobileUrl = async () => {
-    if (!mobileUrl) return;
+  const copyShareUrl = async () => {
+    if (!shareUrl) return;
 
-    await navigator.clipboard.writeText(mobileUrl);
+    await navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
   };
@@ -186,14 +233,12 @@ export default function Home() {
     setSelectedCategoryId(categoryId);
     setSelectedSubtype("all");
     setTimeFilter("all");
-    setFilterOpen(false);
   };
 
   const backToCategories = () => {
     setSelectedCategoryId(null);
     setSelectedSubtype("all");
     setTimeFilter("all");
-    setFilterOpen(false);
   };
 
   const deleteRecord = async (id: string) => {
@@ -212,9 +257,7 @@ export default function Home() {
   };
 
   const reportCoffee = reportRecord ? coffeeTypeMap[reportRecord.coffeeType] : null;
-  const qrSrc = mobileUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=12&data=${encodeURIComponent(mobileUrl)}`
-    : "";
+  const qrSrc = qrDataUrl;
 
   if (isAuthEnabled && (authLoading || !authUser)) {
     return <AuthGate auth={auth} surface="pc" />;
@@ -240,6 +283,14 @@ export default function Home() {
                 <span className="max-w-[220px] truncate text-xs text-white/30">{authUser.email}</span>
                 <button
                   type="button"
+                  onClick={() => void refreshRecords()}
+                  className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/40 transition hover:text-latte"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  同步
+                </button>
+                <button
+                  type="button"
                   onClick={signOut}
                   className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/40 transition hover:text-latte"
                 >
@@ -255,10 +306,10 @@ export default function Home() {
           <StatusPanel totalCaffeine={totalCaffeine} weekCups={weekCups} monthCups={monthCups} hasRecords={records.length > 0} />
           <LogCard records={records} onOpen={() => setHistoryOpen(true)} now={now} />
           <ConnectionPanel
-            mobileUrl={mobileUrl}
+            shareUrl={shareUrl}
             qrSrc={qrSrc}
             copied={copied}
-            onCopy={copyMobileUrl}
+            onCopy={copyShareUrl}
           />
         </section>
 
@@ -270,27 +321,18 @@ export default function Home() {
               <span className="text-xs text-white/30">已录入 {records.length} 杯</span>
             )}
             {selectedCategory && (
-              <div className="topbar-filter-wrap show">
-                <button type="button" className="topbar-filter-btn" onClick={() => setFilterOpen((open) => !open)}>
-                  <Filter className="h-3.5 w-3.5" />
-                  <span>{timeFilterLabels[timeFilter]}</span>
-                  <span className="text-[10px] opacity-40">▼</span>
-                </button>
-                <div className={`topbar-filter-dropdown ${filterOpen ? "show" : ""}`}>
-                  {Object.entries(timeFilterLabels).map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      className={`topbar-filter-option ${timeFilter === id ? "active" : ""}`}
-                      onClick={() => {
-                        setTimeFilter(id);
-                        setFilterOpen(false);
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+              <div className="topbar-filter-tabs" aria-label="时间筛选">
+                <Filter className="h-3.5 w-3.5 shrink-0" />
+                {Object.entries(timeFilterLabels).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`topbar-filter-tab ${timeFilter === id ? "active" : ""}`}
+                    onClick={() => setTimeFilter(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -416,22 +458,28 @@ function LogCard({ records, now, onOpen }: { records: CoffeeRecord[]; now: numbe
 }
 
 function ConnectionPanel({
-  mobileUrl,
+  shareUrl,
   qrSrc,
   copied,
   onCopy,
 }: {
-  mobileUrl: string;
+  shareUrl: string;
   qrSrc: string;
   copied: boolean;
   onCopy: () => void;
 }) {
+  const isPublicUrl =
+    /^https:\/\//.test(shareUrl) &&
+    !/^https?:\/\/(localhost|127\.0\.0\.1|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(shareUrl);
+
   return (
     <section className="glass-card flex min-w-[200px] flex-col items-center gap-4 rounded-2xl p-5">
       <div className="w-full text-center text-xs uppercase tracking-wider text-latte/60">连接舱</div>
       <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white p-2">
-        {qrSrc ? (
-          <img src={qrSrc} alt="手机录入口二维码" className="h-full w-full" />
+        {qrSrc && shareUrl ? (
+          <a href={shareUrl} target="_blank" rel="noreferrer" className="block h-full w-full">
+            <img src={qrSrc} alt="共享入口二维码" className="h-full w-full" />
+          </a>
         ) : (
           <QrCode className="h-10 w-10 text-black/30" />
         )}
@@ -441,7 +489,7 @@ function ConnectionPanel({
           <div className="h-3 w-3 rounded-full bg-neon-green" />
           <div className="absolute inset-0 h-3 w-3 rounded-full bg-neon-green animate-pulse-dot" />
         </div>
-        <span className="text-xs text-neon-green">手机录入口已就绪</span>
+        <span className="text-xs text-neon-green">共享入口已就绪</span>
       </div>
       <button
         type="button"
@@ -449,11 +497,11 @@ function ConnectionPanel({
         className="flex max-w-[210px] items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] text-white/35 transition hover:text-latte"
       >
         <Clipboard className="h-3 w-3 shrink-0" />
-        <span className="truncate">{copied ? "已复制" : mobileUrl || "正在生成手机地址..."}</span>
+        <span className="truncate">{copied ? "已复制" : shareUrl || "正在生成共享地址..."}</span>
       </button>
       <div className="flex items-center gap-1 text-[10px] text-white/20">
         <Smartphone className="h-3 w-3" />
-        同一 Wi-Fi 下手机打开
+        {isPublicUrl ? "电脑/手机自动适配" : "同一 Wi-Fi 下自动适配"}
       </div>
     </section>
   );
