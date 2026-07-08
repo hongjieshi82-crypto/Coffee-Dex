@@ -47,6 +47,7 @@ export default function Home() {
     loading: authLoading,
     user: authUser,
     getAuthHeaders,
+    signOut,
   } = auth;
   const [records, setRecords] = useState<CoffeeRecord[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -70,7 +71,13 @@ export default function Home() {
 
     const headers = await getAuthHeaders();
     const response = await fetch("/api/records", { cache: "no-store", headers });
-    if (!response.ok) return;
+    if (!response.ok) {
+      if (response.status === 401) {
+        setRecords([]);
+        void signOut();
+      }
+      return;
+    }
 
     const data = (await response.json()) as RecordsResponse;
     const incoming = data.records;
@@ -84,7 +91,7 @@ export default function Home() {
 
     recordIdsRef.current = new Set(incoming.map((record) => record.id));
     setRecords(incoming);
-  }, [authUser, getAuthHeaders, isAuthEnabled]);
+  }, [authUser, getAuthHeaders, isAuthEnabled, signOut]);
 
   useEffect(() => {
     const shouldOpenMobile =
@@ -192,7 +199,13 @@ export default function Home() {
   const deleteRecord = async (id: string) => {
     const headers = await getAuthHeaders();
 
-    await fetch(`/api/records?id=${encodeURIComponent(id)}`, { method: "DELETE", headers });
+    const response = await fetch(`/api/records?id=${encodeURIComponent(id)}`, { method: "DELETE", headers });
+    if (response.status === 401) {
+      setRecords([]);
+      void signOut();
+      return;
+    }
+
     setDetailRecord(null);
     setReportRecord(null);
     refreshRecords();
@@ -227,7 +240,7 @@ export default function Home() {
                 <span className="max-w-[220px] truncate text-xs text-white/30">{authUser.email}</span>
                 <button
                   type="button"
-                  onClick={auth.signOut}
+                  onClick={signOut}
                   className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/40 transition hover:text-latte"
                 >
                   退出
@@ -300,7 +313,9 @@ export default function Home() {
 
         <footer className="border-t border-white/5 py-6 text-center">
           <p className="text-xs text-white/20">Coffee-Dex · 每一杯咖啡，都是打工人的勋章</p>
-          <p className="mt-1 text-[10px] text-white/10">Next API 本地同步 · 手机录入，PC 实时刷新</p>
+          <p className="mt-1 text-[10px] text-white/10">
+            {isAuthEnabled ? "Supabase 云端同步 · 手机录入，PC 实时刷新" : "Next API 本地同步 · 手机录入，PC 实时刷新"}
+          </p>
         </footer>
       </div>
 

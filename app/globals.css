@@ -186,6 +186,25 @@ body {
   line-height: 1.5;
 }
 
+.auth-gate-code-mail {
+  padding: 12px 14px;
+  border: 1px solid rgba(195,159,118,0.1);
+  border-radius: 14px;
+  background: rgba(195,159,118,0.06);
+  color: rgba(245,239,230,0.45);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auth-gate-code-mail span {
+  display: block;
+  margin-top: 2px;
+  color: #d4b99a;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .auth-gate-form > button {
   width: 100%;
   margin-top: 4px;
@@ -202,6 +221,30 @@ body {
 .auth-gate-form > button:disabled {
   cursor: not-allowed;
   opacity: 0.42;
+}
+
+.auth-gate-code-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.auth-gate-code-actions button {
+  border: none;
+  background: transparent;
+  color: rgba(245,239,230,0.42);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-gate-code-actions button:hover:not(:disabled) {
+  color: #d4b99a;
+}
+
+.auth-gate-code-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .auth-gate-foot {

@@ -8,6 +8,8 @@ interface AuthConfigResponse {
   authEnabled: boolean;
 }
 
+export type SignUpResult = "signed-in" | "verification-sent";
+
 export interface CoffeeAuth {
   isAuthEnabled: boolean;
   loading: boolean;
@@ -16,7 +18,9 @@ export interface CoffeeAuth {
   message: string;
   getAuthHeaders: () => Promise<Record<string, string>>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<SignUpResult | null>;
+  verifySignUpCode: (email: string, token: string) => Promise<boolean>;
+  resendSignUpCode: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearMessage: () => void;
 }
@@ -121,14 +125,84 @@ export function useCoffeeAuth(): CoffeeAuth {
     if (!supabase) return;
 
     setMessage("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      setMessage(error.message === "Invalid login credentials" ? "邮箱或密码不正确。" : error.message);
+      if (error) {
+        setMessage(error.message === "Invalid login credentials" ? "邮箱或密码不正确。" : error.message);
+      }
+    } catch {
+      setMessage("登录失败，请检查网络后重试。");
     }
   }, [isAuthEnabled]);
 
   const signUp = useCallback(async (email: string, password: string) => {
+    if (!isAuthEnabled) {
+      setMessage("多人登录还没有配置完成。");
+      return null;
+    }
+
+    const supabase = getBrowserSupabase();
+    if (!supabase) return null;
+
+    setMessage("");
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: getEmailRedirectOptions(),
+      });
+
+      if (error) {
+        setMessage(error.message);
+        return null;
+      }
+
+      if (data.session) {
+        setMessage("");
+        return "signed-in";
+      }
+
+      setMessage("验证码已发送，请查收邮箱。");
+      return "verification-sent";
+    } catch {
+      setMessage("注册失败，请检查网络后重试。");
+      return null;
+    }
+  }, [isAuthEnabled]);
+
+  const verifySignUpCode = useCallback(async (email: string, token: string) => {
+    if (!isAuthEnabled) {
+      setMessage("多人登录还没有配置完成。");
+      return false;
+    }
+
+    const supabase = getBrowserSupabase();
+    if (!supabase) return false;
+
+    setMessage("");
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: "signup",
+        options: getOtpRedirectOptions(),
+      });
+
+      if (error) {
+        setMessage(error.message === "Token has expired or is invalid" ? "验证码不正确或已过期。" : error.message);
+        return false;
+      }
+
+      setMessage("");
+      return true;
+    } catch {
+      setMessage("验证失败，请检查网络后重试。");
+      return false;
+    }
+  }, [isAuthEnabled]);
+
+  const resendSignUpCode = useCallback(async (email: string) => {
     if (!isAuthEnabled) {
       setMessage("多人登录还没有配置完成。");
       return;
@@ -138,22 +212,32 @@ export function useCoffeeAuth(): CoffeeAuth {
     if (!supabase) return;
 
     setMessage("");
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: getEmailRedirectOptions(),
+      });
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      setMessage(error ? error.message : "验证码已重新发送。");
+    } catch {
+      setMessage("验证码发送失败，请稍后重试。");
     }
-
-    setMessage(data.session ? "注册成功，已登录。" : "注册成功，请查收邮箱并完成确认。");
   }, [isAuthEnabled]);
 
   const signOut = useCallback(async () => {
     const supabase = getBrowserSupabase();
     if (!supabase) return;
 
-    await supabase.auth.signOut();
-    setMessage("");
+    try {
+      await supabase.auth.signOut();
+      setMessage("");
+    } catch {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      setUser(null);
+      setSession(null);
+      setMessage("");
+    }
   }, []);
 
   return {
@@ -165,7 +249,27 @@ export function useCoffeeAuth(): CoffeeAuth {
     getAuthHeaders,
     signIn,
     signUp,
+    verifySignUpCode,
+    resendSignUpCode,
     signOut,
     clearMessage: () => setMessage(""),
   };
+}
+
+function getAuthRedirectUrl() {
+  if (typeof window === "undefined") return undefined;
+
+  return window.location.origin;
+}
+
+function getEmailRedirectOptions() {
+  const redirectTo = getAuthRedirectUrl();
+
+  return redirectTo ? { emailRedirectTo: redirectTo } : undefined;
+}
+
+function getOtpRedirectOptions() {
+  const redirectTo = getAuthRedirectUrl();
+
+  return redirectTo ? { redirectTo } : undefined;
 }

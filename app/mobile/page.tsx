@@ -38,6 +38,7 @@ export default function MobilePage() {
     loading: authLoading,
     user: authUser,
     getAuthHeaders,
+    signOut,
   } = auth;
   const [imageData, setImageData] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -65,11 +66,18 @@ export default function MobilePage() {
     const headers = await getAuthHeaders();
     const response = await fetch("/api/records", { cache: "no-store", headers });
 
-    if (!response.ok) return;
+    if (!response.ok) {
+      if (response.status === 401) {
+        setRecords([]);
+        setMessage("登录状态已失效，请重新登录。");
+        void signOut();
+      }
+      return;
+    }
 
     const data = (await response.json()) as RecordsResponse;
     setRecords(data.records);
-  }, [authUser, getAuthHeaders, isAuthEnabled]);
+  }, [authUser, getAuthHeaders, isAuthEnabled, signOut]);
 
   const selectedCategory = useMemo(
     () => coffeeCategories.find((category) => category.id === selectedCategoryId) ?? null,
@@ -223,6 +231,10 @@ export default function MobilePage() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: "提交失败，请重试" }));
+        if (response.status === 401) {
+          setRecords([]);
+          void signOut();
+        }
         setMessage(error.error ?? "提交失败，请重试");
         return;
       }
@@ -254,7 +266,7 @@ export default function MobilePage() {
       <MobileHome
         records={records}
         authEmail={authUser?.email ?? null}
-        onSignOut={isAuthEnabled ? auth.signOut : undefined}
+        onSignOut={isAuthEnabled ? signOut : undefined}
         onBackToEntry={() => {
           resetForm();
           setScreen("entry");

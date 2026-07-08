@@ -151,7 +151,12 @@ Coffee-Dex/
    - service_role key
 4. 在 Authentication -> Providers -> Email 中确认 Email 登录已启用。
    - 如果想让用户注册后立刻登录，可以关闭 Confirm email。
-   - 如果开启 Confirm email，用户注册后需要先进邮箱点确认链接。
+   - 如果开启 Confirm email，注册后会进入邮箱验证码页面；验证成功后自动登录。
+5. 如果开启邮箱确认，打开 Authentication -> Emails -> Confirm signup，把邮件正文里加上验证码变量 `{{ .Token }}`，例如：
+   ```text
+   你的 Coffee-Dex 验证码是：{{ .Token }}
+   ```
+   也可以保留默认确认链接，用户点链接同样会回到站点完成确认。
 
 ### 2. 配置环境变量
 
