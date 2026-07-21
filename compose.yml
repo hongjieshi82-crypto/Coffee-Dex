@@ -1,0 +1,13 @@
+services:
+  coffee-dex:
+    build: .
+    container_name: coffee-dex
+    env_file: .env.production
+    ports:
+      - "3000:3000"
+    volumes:
+      - coffee-dex-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  coffee-dex-data:

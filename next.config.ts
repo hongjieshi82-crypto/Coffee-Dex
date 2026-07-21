@@ -8,6 +8,7 @@ const lanIps = Object.values(os.networkInterfaces()).flatMap((addresses) =>
 );
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   allowedDevOrigins: ["127.0.0.1", ...lanIps],
   images: {
     remotePatterns: [

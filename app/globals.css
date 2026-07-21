@@ -3171,6 +3171,118 @@ body {
   pointer-events: none;
 }
 
+/* Visual polish layer: adds depth without changing the app's information layout. */
+.pc-view {
+  position: relative;
+  isolation: isolate;
+  background-color: #171310;
+  background-image:
+    linear-gradient(rgba(255, 236, 210, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 236, 210, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.pc-view::before,
+.mobile-view::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    115deg,
+    transparent 0,
+    transparent 9px,
+    rgba(255, 245, 232, 0.012) 10px,
+    transparent 11px
+  );
+  opacity: 0.7;
+}
+
+.pc-view .glass-card,
+.pc-view .cat-card,
+.pc-view .record-card,
+.pc-view .detail-card,
+.pc-view .log-panel,
+.report-card {
+  box-shadow: inset 0 1px 0 rgba(255, 248, 240, 0.055), 0 16px 38px rgba(0, 0, 0, 0.14);
+}
+
+.pc-view .glass-card,
+.pc-view .cat-card {
+  border-color: rgba(227, 198, 168, 0.11);
+}
+
+.pc-view .cat-card::after,
+.pc-view .record-card::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.pc-view .cat-card:hover::after,
+.pc-view .record-card:hover::after {
+  border-color: rgba(225, 183, 137, 0.26);
+  box-shadow: inset 0 0 28px rgba(195, 159, 118, 0.04);
+}
+
+.pc-view .cat-card:hover,
+.pc-view .record-card:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 248, 240, 0.09), 0 18px 42px rgba(0, 0, 0, 0.25);
+}
+
+.pc-view .topbar-filter-tabs,
+.pc-view .subtype-tabs {
+  border: 1px solid rgba(255, 248, 240, 0.07);
+  background: rgba(7, 6, 5, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 248, 240, 0.035);
+}
+
+.pc-view .topbar-filter-tab.active,
+.pc-view .subtype-tab.active {
+  box-shadow: inset 0 1px 0 rgba(255, 248, 240, 0.14), 0 5px 14px rgba(195, 159, 118, 0.1);
+}
+
+.pc-view header h1 {
+  text-shadow: 0 0 24px rgba(195, 159, 118, 0.22);
+}
+
+.mobile-view {
+  position: relative;
+  isolation: isolate;
+  background-color: #18130f;
+}
+
+.mobile-view .m-upload-card,
+.mobile-view .m-ai-status-card,
+.mobile-view .m-category-card,
+.mobile-view .m-cat-detail-card,
+.mobile-view .m-detail-popup-card {
+  box-shadow: inset 0 1px 0 rgba(255, 248, 240, 0.08), 0 18px 36px rgba(0, 0, 0, 0.18);
+}
+
+.mobile-view .m-upload-zone {
+  box-shadow: inset 0 0 38px rgba(195, 159, 118, 0.035);
+}
+
+.mobile-view .m-header h1 {
+  filter: drop-shadow(0 4px 12px rgba(195, 159, 118, 0.18));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-view *,
+  .mobile-view * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 @keyframes m-fadeDown {
   from { opacity: 0; transform: translateY(-16px); }
   to { opacity: 1; transform: translateY(0); }
