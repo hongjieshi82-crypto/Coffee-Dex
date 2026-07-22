@@ -8,7 +8,8 @@ services:
     container_name: coffee-dex
     env_file: .env.production
     ports:
-      - "3000:3000"
+      # Nginx on the host is the only public entry point (ports 80/443).
+      - "127.0.0.1:3000:3000"
     volumes:
       - coffee-dex-data:/app/data
     restart: unless-stopped
