@@ -22,6 +22,7 @@ import {
   coffeeTypeMap,
 } from "@/coffee-data";
 import { AuthGate } from "@/app/AuthGate";
+import { CoffeeCalendar } from "@/app/CoffeeCalendar";
 import { useCoffeeAuth } from "@/use-coffee-auth";
 
 interface RecordsResponse {
@@ -312,6 +313,8 @@ export default function Home() {
             onCopy={copyShareUrl}
           />
         </section>
+
+        <CoffeeCalendar records={records} onOpenRecord={setDetailRecord} />
 
         <section className="w-full">
           <div className="mb-6 flex items-center gap-3">

@@ -20,6 +20,7 @@ export interface CoffeeRecord {
   categoryId: string;
   volumeMl: number;
   imageData?: string;
+  stickerData?: string;
   caffeine: number;
   temp?: string | null;
   sugar?: string | null;

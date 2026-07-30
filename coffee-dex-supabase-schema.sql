@@ -12,6 +12,8 @@ create table if not exists public.coffee_records (
   volume_ml integer not null default 240,
   image_url text,
   image_path text,
+  sticker_url text,
+  sticker_path text,
   caffeine integer not null default 0,
   temp text,
   sugar text,
@@ -20,6 +22,9 @@ create table if not exists public.coffee_records (
   timestamp bigint not null,
   created_at timestamptz not null default now()
 );
+
+alter table public.coffee_records add column if not exists sticker_url text;
+alter table public.coffee_records add column if not exists sticker_path text;
 
 create index if not exists idx_coffee_records_user_timestamp
   on public.coffee_records(user_id, timestamp desc);

@@ -3273,6 +3273,280 @@ body {
   filter: drop-shadow(0 4px 12px rgba(195, 159, 118, 0.18));
 }
 
+/* Shared calendar: the day cell keeps only the latest record's image. */
+.coffee-calendar {
+  display: block;
+  align-items: start;
+  padding: 22px;
+  border: 1px solid rgba(227, 198, 168, 0.11);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 248, 240, 0.055), 0 16px 38px rgba(0, 0, 0, 0.14);
+}
+
+.coffee-calendar-header,
+.coffee-calendar-weekdays,
+.coffee-calendar-grid {
+  grid-column: 1;
+}
+
+.coffee-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.coffee-calendar-kicker {
+  color: rgba(195, 159, 118, 0.52);
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+
+.coffee-calendar h2 {
+  margin: 5px 0 0;
+  color: var(--latte);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.coffee-calendar-nav {
+  display: flex;
+  gap: 6px;
+}
+
+.coffee-calendar-nav button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(245, 239, 230, 0.5);
+  cursor: pointer;
+}
+
+.coffee-calendar-nav button:hover {
+  border-color: rgba(195, 159, 118, 0.45);
+  color: var(--latte);
+}
+
+.coffee-calendar-weekdays,
+.coffee-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.coffee-calendar-weekdays {
+  margin-top: 20px;
+  color: rgba(245, 239, 230, 0.36);
+  font-size: 11px;
+  text-align: center;
+}
+
+.coffee-calendar-grid {
+  margin-top: 8px;
+}
+
+.coffee-calendar-day {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 92px;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 5px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.025);
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.coffee-calendar-day.empty {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.coffee-calendar-day:hover,
+.coffee-calendar-day.has-record:hover {
+  border-color: rgba(195, 159, 118, 0.48);
+  background: rgba(195, 159, 118, 0.09);
+  transform: translateY(-2px);
+}
+
+.coffee-calendar-day.today {
+  border-color: rgba(195, 159, 118, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(195, 159, 118, 0.16);
+}
+
+.coffee-calendar-number {
+  align-self: flex-start;
+  color: rgba(245, 239, 230, 0.5);
+  font-size: 11px;
+}
+
+.coffee-calendar-day.today .coffee-calendar-number {
+  color: var(--latte);
+  font-weight: 800;
+}
+
+.coffee-calendar-sticker-wrap {
+  position: relative;
+  display: flex;
+  width: 58px;
+  height: 58px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 3px;
+}
+
+.coffee-calendar-sticker {
+  display: block;
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border: 3px solid #fff;
+  border-radius: 44% 48% 45% 50%;
+  background: rgba(195, 159, 118, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(255, 255, 255, 0.16);
+  filter: drop-shadow(0 2px 2px rgba(255, 255, 255, 0.22));
+  transform: rotate(-4deg);
+}
+
+.coffee-calendar-day:nth-child(3n) .coffee-calendar-sticker {
+  transform: rotate(5deg) scale(0.9);
+}
+
+.coffee-calendar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--latte);
+}
+
+.coffee-calendar-count {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--latte);
+  color: #1a1612;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 19px;
+  text-align: center;
+}
+
+.coffee-calendar-note {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: rgba(245, 239, 230, 0.26);
+  font-size: 10px;
+}
+
+.coffee-calendar-note-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--latte);
+}
+
+.coffee-calendar-compact {
+  display: block;
+  margin: 0 16px 4px;
+  padding: 16px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.coffee-calendar-compact .coffee-calendar-header,
+.coffee-calendar-compact .coffee-calendar-weekdays,
+.coffee-calendar-compact .coffee-calendar-grid,
+.coffee-calendar-compact .coffee-calendar-note {
+  width: 100%;
+}
+
+.coffee-calendar-compact h2 {
+  font-size: 17px;
+}
+
+.coffee-calendar-compact .coffee-calendar-kicker {
+  font-size: 9px;
+}
+
+.coffee-calendar-compact .coffee-calendar-weekdays,
+.coffee-calendar-compact .coffee-calendar-grid {
+  gap: 5px;
+}
+
+.coffee-calendar-compact .coffee-calendar-weekdays {
+  margin-top: 14px;
+}
+
+.coffee-calendar-compact .coffee-calendar-day {
+  min-height: 58px;
+  padding: 6px 3px 3px;
+  border-radius: 10px;
+}
+
+.coffee-calendar-compact .coffee-calendar-number {
+  font-size: 10px;
+}
+
+.coffee-calendar-compact .coffee-calendar-sticker-wrap {
+  width: 36px;
+  height: 36px;
+  margin-top: 1px;
+}
+
+.coffee-calendar-compact .coffee-calendar-sticker {
+  width: 34px;
+  height: 34px;
+  border-width: 2px;
+}
+
+.coffee-calendar-compact .coffee-calendar-count {
+  top: -3px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 9px;
+  line-height: 16px;
+}
+
+.coffee-calendar-compact .coffee-calendar-note {
+  margin-top: 8px;
+  font-size: 9px;
+}
+
+@media (max-width: 900px) {
+  .coffee-calendar {
+    display: block;
+  }
+
+  .coffee-calendar-note {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .coffee-calendar:not(.coffee-calendar-compact) {
+    margin: 0 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pc-view *,
   .mobile-view * {

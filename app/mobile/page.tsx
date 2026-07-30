@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Camera, CheckCircle2, ChevronLeft, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import { CoffeeRecord, coffeeCategories, coffeeTypeMap, getExactCoffeeMatch, searchCoffeeTypes } from "@/coffee-data";
 import { AuthGate } from "@/app/AuthGate";
+import { CoffeeCalendar } from "@/app/CoffeeCalendar";
 import { useCoffeeAuth } from "@/use-coffee-auth";
 
 const tempOptions = ["热", "冰", "常温"];
@@ -53,6 +54,8 @@ export default function MobilePage() {
     signOut,
   } = auth;
   const [imageData, setImageData] = useState<string | null>(null);
+  const [stickerData, setStickerData] = useState<string | null>(null);
+  const [creatingSticker, setCreatingSticker] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [temp, setTemp] = useState<string | null>(null);
@@ -137,6 +140,8 @@ export default function MobilePage() {
     setMessage("正在压缩照片...");
     const compressed = await compressImage(file);
     setImageData(compressed);
+    setStickerData(null);
+    setCreatingSticker(true);
     setSelectedCategoryId(null);
     setSelectedTypeId(null);
     setSearchTerm("");
@@ -145,11 +150,17 @@ export default function MobilePage() {
     setLastRecord(null);
     setShowResultCard(false);
     void recognizeImage(compressed);
+    void createSticker(compressed).then((sticker) => {
+      setStickerData(sticker);
+      setCreatingSticker(false);
+    });
     event.target.value = "";
   };
 
   const resetForm = () => {
     setImageData(null);
+    setStickerData(null);
+    setCreatingSticker(false);
     setSelectedCategoryId(null);
     setSelectedTypeId(null);
     setSearchTerm("");
@@ -166,6 +177,8 @@ export default function MobilePage() {
 
   const resetPhoto = () => {
     setImageData(null);
+    setStickerData(null);
+    setCreatingSticker(false);
     setSelectedCategoryId(null);
     setSelectedTypeId(null);
     setSearchTerm("");
@@ -276,6 +289,7 @@ export default function MobilePage() {
           coffeeType: selectedCoffee.id,
           coffeeName: displayName,
           imageData,
+          stickerData: stickerData ?? undefined,
           volumeMl: Number(volumeMl),
           temp,
           sugar,
@@ -588,7 +602,9 @@ export default function MobilePage() {
         />
       )}
 
-      <div className={`m-toast ${message ? "show" : ""}`}>{message}</div>
+      <div className={`m-toast ${message || creatingSticker ? "show" : ""}`}>
+        {message || (creatingSticker ? "正在生成贴纸..." : "")}
+      </div>
     </main>
   );
 }
@@ -786,7 +802,7 @@ function MobileHome({
             </div>
             <div className="m-home-version">打工人の咖啡因图鉴</div>
           </div>
-          <div className="m-home-stats">
+        <div className="m-home-stats">
             <MobileStat value={totalCaffeine.toString()} label="当前续命值" unit="mg 咖啡因" />
             <div className="m-home-divider" />
             <MobileStat value={weekCups.toString()} label="本周已录入" unit="杯" />
@@ -794,6 +810,8 @@ function MobileHome({
             <MobileStat value={monthCups.toString()} label="本月总杯数" unit="杯" accent />
           </div>
         </div>
+
+        <CoffeeCalendar records={records} compact onOpenRecord={setSelectedRecord} />
 
         <div className="m-home-section-title">
           <span>咖啡图鉴</span>
@@ -834,6 +852,7 @@ function MobileHome({
           )}
         </div>
       </div>
+      {selectedRecord && <MobileDetailPopup record={selectedRecord} onClose={() => setSelectedRecord(null)} />}
     </main>
   );
 }
@@ -1076,5 +1095,29 @@ function compressImage(file: File) {
       image.src = String(reader.result);
     };
     reader.readAsDataURL(file);
+  });
+}
+
+async function createSticker(imageData: string) {
+  try {
+    const { removeBackground } = await import("@imgly/background-removal");
+    const blob = await removeBackground(imageData, {
+      model: "isnet_fp16",
+      output: { format: "image/png" },
+    });
+
+    return await blobToDataUrl(blob);
+  } catch (error) {
+    console.warn("[Coffee-Dex] Sticker generation failed:", error);
+    return null;
+  }
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("贴纸读取失败"));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(blob);
   });
 }

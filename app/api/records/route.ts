@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
     categoryId: coffee.categoryId,
     volumeMl: Math.round(volumeMl),
     imageData: typeof body.imageData === "string" ? body.imageData : undefined,
+    stickerData: typeof body.stickerData === "string" ? body.stickerData : undefined,
     caffeine: getCaffeine(coffee.id, volumeMl),
     temp: typeof body.temp === "string" ? body.temp : null,
     sugar: typeof body.sugar === "string" ? body.sugar : null,

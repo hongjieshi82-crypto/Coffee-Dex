@@ -12,6 +12,8 @@ interface CoffeeRecordRow {
   volume_ml: number;
   image_url: string | null;
   image_path: string | null;
+  sticker_url: string | null;
+  sticker_path: string | null;
   image_data?: string | null;
   caffeine: number;
   temp: string | null;
@@ -39,6 +41,9 @@ export async function addSupabaseRecord(userId: string, record: CoffeeRecord) {
   const image = record.imageData?.startsWith("data:image/")
     ? await uploadRecordImage(userId, record.id, record.imageData)
     : { imageUrl: record.imageData ?? null, imagePath: null };
+  const sticker = record.stickerData?.startsWith("data:image/")
+    ? await uploadRecordImage(userId, `${record.id}-sticker`, record.stickerData)
+    : { imageUrl: record.stickerData ?? null, imagePath: null };
 
   const { data, error } = await supabase
     .from("coffee_records")
@@ -51,6 +56,8 @@ export async function addSupabaseRecord(userId: string, record: CoffeeRecord) {
       volume_ml: record.volumeMl,
       image_url: image.imageUrl,
       image_path: image.imagePath,
+      sticker_url: sticker.imageUrl,
+      sticker_path: sticker.imagePath,
       caffeine: record.caffeine,
       temp: record.temp ?? null,
       sugar: record.sugar ?? null,
@@ -72,7 +79,7 @@ export async function deleteSupabaseRecord(userId: string, id?: string | null) {
   if (!id) {
     const existing = await getSupabaseRecords(userId);
     const imagePaths = existing
-      .map((record) => getStoragePathFromUrl(record.imageData))
+      .flatMap((record) => [getStoragePathFromUrl(record.imageData), getStoragePathFromUrl(record.stickerData)])
       .filter((path): path is string => Boolean(path));
 
     await supabase.from("coffee_records").delete().eq("user_id", userId);
@@ -83,7 +90,7 @@ export async function deleteSupabaseRecord(userId: string, id?: string | null) {
 
   const { data: existing } = await supabase
     .from("coffee_records")
-    .select("image_path,image_url")
+    .select("image_path,image_url,sticker_path,sticker_url")
     .eq("user_id", userId)
     .eq("id", id)
     .maybeSingle();
@@ -92,8 +99,11 @@ export async function deleteSupabaseRecord(userId: string, id?: string | null) {
 
   if (error) throw error;
 
-  const imagePath = existing?.image_path ?? getStoragePathFromUrl(existing?.image_url);
-  if (imagePath) await supabase.storage.from(storageBucket).remove([imagePath]);
+  const imagePaths = [
+    existing?.image_path ?? getStoragePathFromUrl(existing?.image_url),
+    existing?.sticker_path ?? getStoragePathFromUrl(existing?.sticker_url),
+  ].filter((path): path is string => Boolean(path));
+  if (imagePaths.length) await supabase.storage.from(storageBucket).remove(imagePaths);
 
   return getSupabaseRecords(userId);
 }
@@ -158,6 +168,7 @@ function mapRecordRow(row: CoffeeRecordRow): CoffeeRecord {
     categoryId: row.category_id,
     volumeMl: row.volume_ml,
     imageData: row.image_url ?? row.image_data ?? undefined,
+    stickerData: row.sticker_url ?? undefined,
     caffeine: row.caffeine,
     temp: row.temp,
     sugar: row.sugar,
