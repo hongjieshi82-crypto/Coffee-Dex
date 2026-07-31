@@ -247,6 +247,27 @@ body {
   opacity: 0.45;
 }
 
+.auth-gate-secondary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-gate-secondary button,
+.auth-gate-text-button {
+  border: none;
+  background: transparent;
+  color: rgba(245,239,230,0.52);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-gate-secondary button:hover,
+.auth-gate-text-button:hover {
+  color: #d4b99a;
+}
+
 .auth-gate-foot {
   margin-top: 18px;
   padding-top: 15px;
@@ -502,6 +523,36 @@ body {
   animation: pc-fade-in-down 0.4s ease-out;
 }
 
+.pc-view .gallery-scale-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.035);
+}
+
+.pc-view .gallery-scale-controls button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255,255,255,0.42);
+  cursor: pointer;
+}
+
+.pc-view .gallery-scale-controls button:hover,
+.pc-view .gallery-scale-controls button.active {
+  background: rgba(195,159,118,0.16);
+  color: var(--latte);
+}
+
 .pc-view .sub-back-btn {
   display: flex;
   align-items: center;
@@ -713,7 +764,17 @@ body {
 
 .pc-view .record-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+}
+
+.pc-view .record-grid-compact {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 10px;
+}
+
+.pc-view .record-grid-large {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
   gap: 16px;
 }
 
@@ -738,7 +799,7 @@ body {
 
 .pc-view .record-card-photo {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 18px 18px 0 0;
   background: rgba(255,255,255,0.03);
@@ -763,13 +824,13 @@ body {
 .pc-view .record-card-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px 16px;
+  gap: 5px;
+  padding: 11px 12px 12px;
 }
 
 .pc-view .record-card-name {
   color: var(--latte);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -781,7 +842,7 @@ body {
 
 .pc-view .record-tag {
   display: inline-block;
-  padding: 2px 10px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: rgba(195,159,118,0.1);
   border: 1px solid rgba(195,159,118,0.15);
@@ -792,8 +853,8 @@ body {
 
 .pc-view .record-card-meta {
   display: flex;
-  gap: 10px;
-  font-size: 11px;
+  gap: 7px;
+  font-size: 10px;
   color: rgba(255,255,255,0.35);
 }
 
@@ -807,7 +868,7 @@ body {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   color: rgba(255,255,255,0.3);
   font-size: 12px;
   font-style: italic;
@@ -818,6 +879,23 @@ body {
   margin-top: 4px;
   color: rgba(255,255,255,0.2);
   font-size: 10px;
+}
+
+.pc-view .record-grid-compact .record-card-photo {
+  aspect-ratio: 1 / 1;
+}
+
+.pc-view .record-grid-compact .record-card-body {
+  padding: 9px 10px 10px;
+}
+
+.pc-view .record-grid-compact .record-card-comment,
+.pc-view .record-grid-compact .record-card-date {
+  display: none;
+}
+
+.pc-view .record-grid-large .record-card-photo {
+  aspect-ratio: 3 / 4;
 }
 
 .pc-view .record-card-del {
@@ -3410,12 +3488,10 @@ body {
   display: block;
   width: 54px;
   height: 54px;
-  object-fit: cover;
-  border: 3px solid #fff;
-  border-radius: 44% 48% 45% 50%;
-  background: rgba(195, 159, 118, 0.16);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(255, 255, 255, 0.16);
-  filter: drop-shadow(0 2px 2px rgba(255, 255, 255, 0.22));
+  object-fit: contain;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.36));
   transform: rotate(-4deg);
 }
 

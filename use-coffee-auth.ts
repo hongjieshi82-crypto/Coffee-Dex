@@ -46,6 +46,10 @@ export interface CoffeeAuth {
   signUp: (email: string, password: string) => Promise<SignUpResult | null>;
   verifySignUpCode: (email: string, token: string) => Promise<boolean>;
   resendSignUpCode: (email: string) => Promise<void>;
+  sendLoginCode: (email: string) => Promise<boolean>;
+  verifyLoginCode: (email: string, token: string) => Promise<boolean>;
+  startPasswordReset: (email: string) => Promise<boolean>;
+  resetPasswordWithCode: (email: string, token: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   clearMessage: () => void;
 }
@@ -335,6 +339,120 @@ export function useCoffeeAuth(): CoffeeAuth {
     }
   }, [authMode, isAuthEnabled]);
 
+  const sendLoginCode = useCallback(async (email: string) => {
+    if (!isAuthEnabled) return false;
+    setMessage("");
+
+    if (authMode === "local") {
+      return sendLocalCode("login-code", email, undefined, setMessage);
+    }
+
+    const supabase = getBrowserSupabase();
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false, ...getEmailRedirectOptions() },
+      });
+      if (error) {
+        setMessage(mapSupabaseAuthError(error.message, "验证码发送失败，请稍后重试。"));
+        return false;
+      }
+      setMessage("验证码已发送，请查收邮箱。");
+      return true;
+    } catch {
+      setMessage("网络异常，验证码发送失败，请稍后重试。");
+      return false;
+    }
+  }, [authMode, isAuthEnabled]);
+
+  const verifyLoginCode = useCallback(async (email: string, token: string) => {
+    if (!isAuthEnabled) return false;
+    setMessage("");
+
+    if (authMode === "local") {
+      const localSession = await verifyLocalCode("verify-login-code", email, token, undefined, setMessage);
+      if (!localSession) return false;
+      storeLocalToken(localSession.access_token);
+      setSession(localSession);
+      setUser(localSession.user);
+      return true;
+    }
+
+    const supabase = getBrowserSupabase();
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+      if (error) {
+        setMessage(mapSupabaseAuthError(error.message, "验证码不正确或已过期。"));
+        return false;
+      }
+      return true;
+    } catch {
+      setMessage("网络异常，验证失败，请稍后重试。");
+      return false;
+    }
+  }, [authMode, isAuthEnabled]);
+
+  const startPasswordReset = useCallback(async (email: string) => {
+    if (!isAuthEnabled) return false;
+    setMessage("");
+
+    if (authMode === "local") {
+      return sendLocalCode("reset-password", email, undefined, setMessage);
+    }
+
+    const supabase = getBrowserSupabase();
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, getOtpRedirectOptions());
+      if (error) {
+        setMessage(mapSupabaseAuthError(error.message, "验证码发送失败，请稍后重试。"));
+        return false;
+      }
+      setMessage("验证码已发送，请查收邮箱。");
+      return true;
+    } catch {
+      setMessage("网络异常，验证码发送失败，请稍后重试。");
+      return false;
+    }
+  }, [authMode, isAuthEnabled]);
+
+  const resetPasswordWithCode = useCallback(async (email: string, token: string, password: string) => {
+    if (!isAuthEnabled) return false;
+    setMessage("");
+
+    if (authMode === "local") {
+      const localSession = await verifyLocalCode("verify-reset-password", email, token, password, setMessage);
+      if (!localSession) return false;
+      storeLocalToken(localSession.access_token);
+      setSession(localSession);
+      setUser(localSession.user);
+      return true;
+    }
+
+    const supabase = getBrowserSupabase();
+    if (!supabase) return false;
+    try {
+      const { error: verifyError } = await supabase.auth.verifyOtp({ email, token, type: "recovery" });
+      if (verifyError) {
+        setMessage(mapSupabaseAuthError(verifyError.message, "验证码不正确或已过期。"));
+        return false;
+      }
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        setMessage(updateError.message);
+        return false;
+      }
+      setMessage("");
+      return true;
+    } catch {
+      setMessage("网络异常，重置密码失败，请稍后重试。");
+      return false;
+    }
+  }, [authMode, isAuthEnabled]);
+
   const signOut = useCallback(async () => {
     if (authMode === "local") {
       removeStoredLocalToken();
@@ -369,9 +487,22 @@ export function useCoffeeAuth(): CoffeeAuth {
     signUp,
     verifySignUpCode,
     resendSignUpCode,
+    sendLoginCode,
+    verifyLoginCode,
+    startPasswordReset,
+    resetPasswordWithCode,
     signOut,
     clearMessage: () => setMessage(""),
   };
+}
+
+function mapSupabaseAuthError(message: string, fallback: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("not found") || normalized.includes("signups not allowed")) {
+    return "该邮箱尚未注册，请先注册账号。";
+  }
+  if (normalized.includes("expired") || normalized.includes("invalid")) return "验证码不正确或已过期。";
+  return message || fallback;
 }
 
 async function submitLocalAuth(
@@ -483,6 +614,56 @@ async function resendLocalSignup(email: string, setMessage: (message: string) =>
     setMessage(response.ok && data.ok ? "验证码已重新发送。" : data.error ?? "验证码发送失败。");
   } catch {
     setMessage("验证码发送失败，请稍后重试。");
+  }
+}
+
+async function sendLocalCode(
+  action: "login-code" | "reset-password",
+  email: string,
+  password: undefined,
+  setMessage: (message: string) => void
+) {
+  try {
+    const response = await fetch("/api/auth/local", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, email, password }),
+    });
+    const data = (await response.json()) as LocalAuthResponse;
+    if (!response.ok || !data.ok) {
+      setMessage(data.error ?? "验证码发送失败，请稍后重试。");
+      return false;
+    }
+    setMessage("验证码已发送，请查收邮箱。");
+    return true;
+  } catch {
+    setMessage("网络异常，验证码发送失败，请稍后重试。");
+    return false;
+  }
+}
+
+async function verifyLocalCode(
+  action: "verify-login-code" | "verify-reset-password",
+  email: string,
+  code: string,
+  password: string | undefined,
+  setMessage: (message: string) => void
+): Promise<LocalSession | null> {
+  try {
+    const response = await fetch("/api/auth/local", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, email, code, password }),
+    });
+    const data = (await response.json()) as LocalAuthResponse;
+    if (!response.ok || !data.access_token || !data.user) {
+      setMessage(data.error ?? "验证码不正确或已过期。");
+      return null;
+    }
+    return { access_token: data.access_token, user: data.user };
+  } catch {
+    setMessage("网络异常，验证失败，请稍后重试。");
+    return null;
   }
 }
 

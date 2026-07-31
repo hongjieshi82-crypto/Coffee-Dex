@@ -10,6 +10,9 @@ import {
   Clipboard,
   Coffee,
   Filter,
+  Maximize2,
+  Minus,
+  Plus,
   QrCode,
   RefreshCw,
   Smartphone,
@@ -64,6 +67,7 @@ export default function Home() {
   const [detailRecord, setDetailRecord] = useState<CoffeeRecord | null>(null);
   const [reportRecord, setReportRecord] = useState<CoffeeRecord | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [galleryScale, setGalleryScale] = useState<"compact" | "balanced" | "large">("balanced");
   const initializedRef = useRef(false);
   const recordIdsRef = useRef<Set<string>>(new Set());
 
@@ -346,6 +350,8 @@ export default function Home() {
               records={records}
               visibleRecords={visibleRecords}
               selectedSubtype={selectedSubtype}
+              galleryScale={galleryScale}
+              onGalleryScaleChange={setGalleryScale}
               onBack={backToCategories}
               onSubtypeChange={setSelectedSubtype}
               onOpenRecord={setDetailRecord}
@@ -553,6 +559,8 @@ function CategoryDetail({
   records,
   visibleRecords,
   selectedSubtype,
+  galleryScale,
+  onGalleryScaleChange,
   onBack,
   onSubtypeChange,
   onOpenRecord,
@@ -562,6 +570,8 @@ function CategoryDetail({
   records: CoffeeRecord[];
   visibleRecords: CoffeeRecord[];
   selectedSubtype: string;
+  galleryScale: "compact" | "balanced" | "large";
+  onGalleryScaleChange: (scale: "compact" | "balanced" | "large") => void;
   onBack: () => void;
   onSubtypeChange: (subtype: string) => void;
   onOpenRecord: (record: CoffeeRecord) => void;
@@ -576,6 +586,17 @@ function CategoryDetail({
         </button>
         <div className="sub-title">{category.name}</div>
         <span className="sub-en">{category.en}</span>
+        <div className="gallery-scale-controls" aria-label="图鉴卡片大小">
+          <button type="button" title="缩小卡片" aria-label="缩小卡片" onClick={() => onGalleryScaleChange("compact")} className={galleryScale === "compact" ? "active" : ""}>
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" title="自适应卡片" aria-label="自适应卡片" onClick={() => onGalleryScaleChange("balanced")} className={galleryScale === "balanced" ? "active" : ""}>
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" title="放大卡片" aria-label="放大卡片" onClick={() => onGalleryScaleChange("large")} className={galleryScale === "large" ? "active" : ""}>
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="subtype-tabs">
@@ -598,7 +619,7 @@ function CategoryDetail({
         ))}
       </div>
 
-      <div className="record-grid">
+      <div className={`record-grid record-grid-${galleryScale}`}>
         {visibleRecords.length ? (
           visibleRecords.map((record, index) => (
             <RecordCard

@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getLocalRequestUser,
   resendLocalSignUpCode,
+  resetLocalPassword,
+  sendLocalLoginCode,
   signInLocalUser,
+  startLocalPasswordReset,
   startLocalSignUp,
+  verifyLocalLoginCode,
   verifyLocalSignUp,
 } from "@/local-auth";
 
@@ -41,6 +45,22 @@ export async function POST(request: NextRequest) {
 
     if (action === "signin") {
       return NextResponse.json(await signInLocalUser(email, password));
+    }
+
+    if (action === "login-code") {
+      return NextResponse.json(await sendLocalLoginCode(email));
+    }
+
+    if (action === "verify-login-code") {
+      return NextResponse.json(await verifyLocalLoginCode(email, code));
+    }
+
+    if (action === "reset-password") {
+      return NextResponse.json(await startLocalPasswordReset(email));
+    }
+
+    if (action === "verify-reset-password") {
+      return NextResponse.json(await resetLocalPassword(email, code, password));
     }
 
     return NextResponse.json({ error: "未知登录操作。" }, { status: 400 });

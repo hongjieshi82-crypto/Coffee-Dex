@@ -27,15 +27,28 @@ interface PendingSignupRecord {
   sentAt: number;
 }
 
+type EmailCodePurpose = "login" | "password-reset";
+
+interface PendingEmailCodeRecord {
+  email: string;
+  purpose: EmailCodePurpose;
+  codeHash: string;
+  codeSalt: string;
+  expiresAt: number;
+  sentAt: number;
+}
+
 interface LocalUserState {
   users: LocalUserRecord[];
   pendingSignups?: PendingSignupRecord[];
+  pendingEmailCodes?: PendingEmailCodeRecord[];
   updatedAt: number;
 }
 
 const usersPath = path.join(process.cwd(), "data", "local-users.json");
 const tokenTtlMs = 30 * 24 * 60 * 60 * 1000;
 const signupCodeTtlMs = 10 * 60 * 1000;
+const resendCooldownMs = 60 * 1000;
 let cache: LocalUserState | null = null;
 
 export async function startLocalSignUp(email: string, password: string) {
@@ -49,9 +62,7 @@ export async function startLocalSignUp(email: string, password: string) {
     throw new Error("这个邮箱已经注册，请直接登录。");
   }
 
-  if (!isEmailSenderConfigured()) {
-    return createLocalUser(normalizedEmail, password);
-  }
+  ensureEmailSenderConfigured();
 
   const { pending, code } = createPendingSignup(normalizedEmail, password);
   const pendingSignups = [
@@ -130,6 +141,10 @@ export async function resendLocalSignUpCode(email: string) {
     throw new Error("注册验证码已过期，请重新注册。");
   }
 
+  if (previous.sentAt + resendCooldownMs > Date.now()) {
+    throw new Error("请在 60 秒后再重新发送验证码。");
+  }
+
   const code = createVerificationCode();
   const codeSalt = crypto.randomBytes(16).toString("hex");
   const nextPending: PendingSignupRecord = {
@@ -194,25 +209,41 @@ export async function signInLocalUser(email: string, password: string) {
   }
 
   if (!user.emailVerifiedAt) {
-    if (!isEmailSenderConfigured()) {
-      const verifiedUser: LocalUserRecord = {
-        ...user,
-        emailVerifiedAt: Date.now(),
-      };
-
-      await writeUserState({
-        ...state,
-        users: state.users.map((item) => (item.id === verifiedUser.id ? verifiedUser : item)),
-        updatedAt: Date.now(),
-      });
-
-      return createLocalSession(verifiedUser);
-    }
-
-    throw new Error("这个账号还没有完成邮箱验证。请配置邮件服务后重新注册或完成邮箱验证。");
+    throw new Error("这个账号还没有完成邮箱验证，请完成注册验证后再登录。");
   }
 
   return createLocalSession(user);
+}
+
+export async function sendLocalLoginCode(email: string) {
+  return sendLocalEmailCode(email, "login");
+}
+
+export async function verifyLocalLoginCode(email: string, code: string) {
+  const user = await verifyLocalEmailCode(email, code, "login");
+  return createLocalSession(user);
+}
+
+export async function startLocalPasswordReset(email: string) {
+  return sendLocalEmailCode(email, "password-reset");
+}
+
+export async function resetLocalPassword(email: string, code: string, password: string) {
+  const user = await verifyLocalEmailCode(email, code, "password-reset");
+  validateCredentials(user.email, password);
+  const salt = crypto.randomBytes(16).toString("hex");
+  const nextUser: LocalUserRecord = {
+    ...user,
+    salt,
+    passwordHash: hashPassword(password, salt),
+  };
+  const state = await readUserState();
+  await writeUserState({
+    ...state,
+    users: state.users.map((item) => (item.id === user.id ? nextUser : item)),
+    updatedAt: Date.now(),
+  });
+  return createLocalSession(nextUser);
 }
 
 export async function getLocalRequestUser(request: NextRequest) {
@@ -295,12 +326,16 @@ async function readUserState(): Promise<LocalUserState> {
       pendingSignups: Array.isArray(parsed.pendingSignups)
         ? parsed.pendingSignups.filter((item) => item.expiresAt > Date.now())
         : [],
+      pendingEmailCodes: Array.isArray(parsed.pendingEmailCodes)
+        ? parsed.pendingEmailCodes.filter((item) => item.expiresAt > Date.now())
+        : [],
       updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now(),
     };
   } catch {
     cache = {
       users: [],
       pendingSignups: [],
+      pendingEmailCodes: [],
       updatedAt: Date.now(),
     };
   }
@@ -350,6 +385,81 @@ function createPendingSignup(email: string, password: string) {
 
 function createVerificationCode() {
   return crypto.randomInt(100000, 1000000).toString();
+}
+
+async function sendLocalEmailCode(email: string, purpose: EmailCodePurpose) {
+  ensureEmailSenderConfigured();
+  const normalizedEmail = normalizeEmail(email);
+  const state = await readUserState();
+  const user = state.users.find((item) => item.email === normalizedEmail);
+
+  if (!user) {
+    throw new Error("该邮箱尚未注册，请先注册账号。");
+  }
+
+  const previous = (state.pendingEmailCodes ?? []).find(
+    (item) => item.email === normalizedEmail && item.purpose === purpose
+  );
+  if (previous && previous.sentAt + resendCooldownMs > Date.now()) {
+    throw new Error("请在 60 秒后再重新发送验证码。");
+  }
+
+  const code = createVerificationCode();
+  const codeSalt = crypto.randomBytes(16).toString("hex");
+  const pending: PendingEmailCodeRecord = {
+    email: normalizedEmail,
+    purpose,
+    codeHash: hashPassword(code, codeSalt),
+    codeSalt,
+    expiresAt: Date.now() + signupCodeTtlMs,
+    sentAt: Date.now(),
+  };
+  await writeUserState({
+    ...state,
+    pendingEmailCodes: [
+      pending,
+      ...(state.pendingEmailCodes ?? []).filter(
+        (item) => !(item.email === normalizedEmail && item.purpose === purpose) && item.expiresAt > Date.now()
+      ),
+    ],
+    updatedAt: Date.now(),
+  });
+
+  const label = purpose === "login" ? "登录" : "重置密码";
+  await sendEmail({
+    to: normalizedEmail,
+    subject: `Coffee-Dex ${label}验证码`,
+    text: `你的 Coffee-Dex ${label}验证码是：${code}\n\n验证码 10 分钟内有效。如果不是你本人操作，请忽略这封邮件。`,
+  });
+  return { ok: true };
+}
+
+async function verifyLocalEmailCode(email: string, code: string, purpose: EmailCodePurpose) {
+  const normalizedEmail = normalizeEmail(email);
+  const state = await readUserState();
+  const pending = (state.pendingEmailCodes ?? []).find(
+    (item) => item.email === normalizedEmail && item.purpose === purpose
+  );
+  if (!pending || pending.expiresAt < Date.now()) {
+    throw new Error("验证码已过期，请重新发送。");
+  }
+  if (hashPassword(code.trim(), pending.codeSalt) !== pending.codeHash) {
+    throw new Error("验证码不正确。");
+  }
+  const user = state.users.find((item) => item.email === normalizedEmail);
+  if (!user) throw new Error("该邮箱尚未注册，请先注册账号。");
+  await writeUserState({
+    ...state,
+    pendingEmailCodes: (state.pendingEmailCodes ?? []).filter((item) => item !== pending),
+    updatedAt: Date.now(),
+  });
+  return user;
+}
+
+function ensureEmailSenderConfigured() {
+  if (!isEmailSenderConfigured()) {
+    throw new Error("邮件发送服务未配置，无法发送验证码。");
+  }
 }
 
 async function sendSignupCode(email: string, code: string) {

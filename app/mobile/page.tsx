@@ -1106,11 +1106,68 @@ async function createSticker(imageData: string) {
       output: { format: "image/png" },
     });
 
-    return await blobToDataUrl(blob);
+    return await trimTransparentSticker(blob);
   } catch (error) {
     console.warn("[Coffee-Dex] Sticker generation failed:", error);
     return null;
   }
+}
+
+async function trimTransparentSticker(blob: Blob) {
+  const bitmap = await createImageBitmap(blob);
+  const source = document.createElement("canvas");
+  source.width = bitmap.width;
+  source.height = bitmap.height;
+  const sourceContext = source.getContext("2d", { willReadFrequently: true });
+
+  if (!sourceContext) return blobToDataUrl(blob);
+
+  sourceContext.drawImage(bitmap, 0, 0);
+  const { data, width, height } = sourceContext.getImageData(0, 0, source.width, source.height);
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (data[(y * width + x) * 4 + 3] > 20) {
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+    }
+  }
+
+  if (right < left || bottom < top) return blobToDataUrl(blob);
+
+  const padding = Math.max(10, Math.round(Math.max(right - left, bottom - top) * 0.06));
+  const cropWidth = right - left + 1;
+  const cropHeight = bottom - top + 1;
+  const longestSide = Math.max(cropWidth, cropHeight) + padding * 2;
+  const outputSize = Math.min(512, longestSide);
+  const scale = outputSize / longestSide;
+  const output = document.createElement("canvas");
+  output.width = Math.round((cropWidth + padding * 2) * scale);
+  output.height = Math.round((cropHeight + padding * 2) * scale);
+  const outputContext = output.getContext("2d");
+
+  if (!outputContext) return blobToDataUrl(blob);
+
+  outputContext.drawImage(
+    source,
+    left,
+    top,
+    cropWidth,
+    cropHeight,
+    Math.round(padding * scale),
+    Math.round(padding * scale),
+    Math.round(cropWidth * scale),
+    Math.round(cropHeight * scale)
+  );
+  bitmap.close();
+  return output.toDataURL("image/png");
 }
 
 function blobToDataUrl(blob: Blob) {
