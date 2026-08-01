@@ -14,17 +14,28 @@ export function isEmailSenderConfigured() {
 }
 
 export async function sendEmail({ to, subject, text }: EmailOptions) {
-  if (process.env.RESEND_API_KEY) {
-    await sendWithResend({ to, subject, text });
-    return;
-  }
+  try {
+    if (process.env.RESEND_API_KEY) {
+      await sendWithResend({ to, subject, text });
+      return;
+    }
 
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.EMAIL_FROM) {
-    await sendWithSmtp({ to, subject, text });
-    return;
-  }
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.EMAIL_FROM) {
+      await sendWithSmtp({ to, subject, text });
+      return;
+    }
 
-  throw new Error("邮件发送服务未配置，无法验证邮箱。");
+    throw new Error("邮件发送服务未配置，无法验证邮箱。");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (message.includes("邮件发送服务未配置")) {
+      throw error;
+    }
+
+    console.error("Unable to send Coffee-Dex verification email:", error);
+    throw new Error("验证码邮件发送失败，请稍后重试或联系管理员检查发信服务。");
+  }
 }
 
 async function sendWithResend({ to, subject, text }: EmailOptions) {
