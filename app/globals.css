@@ -539,36 +539,6 @@ body {
   animation: pc-fade-in-down 0.4s ease-out;
 }
 
-.pc-view .gallery-scale-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  padding: 3px;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.035);
-}
-
-.pc-view .gallery-scale-controls button {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: rgba(255,255,255,0.42);
-  cursor: pointer;
-}
-
-.pc-view .gallery-scale-controls button:hover,
-.pc-view .gallery-scale-controls button.active {
-  background: rgba(195,159,118,0.16);
-  color: var(--latte);
-}
-
 .pc-view .sub-back-btn {
   display: flex;
   align-items: center;
@@ -780,18 +750,8 @@ body {
 
 .pc-view .record-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-}
-
-.pc-view .record-grid-compact {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
-  gap: 10px;
-}
-
-.pc-view .record-grid-large {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
-  gap: 16px;
 }
 
 .pc-view .record-card {
@@ -910,23 +870,6 @@ body {
   margin-top: 4px;
   color: rgba(255,255,255,0.2);
   font-size: 10px;
-}
-
-.pc-view .record-grid-compact .record-card-photo {
-  aspect-ratio: 1 / 1;
-}
-
-.pc-view .record-grid-compact .record-card-body {
-  padding: 9px 10px 10px;
-}
-
-.pc-view .record-grid-compact .record-card-comment,
-.pc-view .record-grid-compact .record-card-date {
-  display: none;
-}
-
-.pc-view .record-grid-large .record-card-photo {
-  aspect-ratio: 3 / 4;
 }
 
 .pc-view .record-card-del {
