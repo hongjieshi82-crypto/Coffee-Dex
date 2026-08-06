@@ -1,0 +1,16 @@
+Coffee-Dex third-party software notices
+
+@imgly/background-removal 1.7.0
+Copyright IMG.LY GmbH and contributors.
+License: GNU Affero General Public License, version 3.
+License text: /legal/imgly-background-removal-license.txt
+Upstream source: https://github.com/imgly/background-removal-js
+
+The dependency's bundled third-party license list is available at:
+/legal/imgly-background-removal-third-party-licenses.json
+
+Coffee-Dex source code is available at:
+https://github.com/hongjieshi82-crypto/Coffee-Dex
+
+The AGPL-licensed component is provided without warranty, as described in
+the full license text above.

@@ -1,13 +1,26 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, CheckCircle2, ChevronLeft, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
-import { CoffeeRecord, coffeeCategories, coffeeTypeMap, getExactCoffeeMatch, searchCoffeeTypes } from "@/coffee-data";
+import {
+  CoffeeRecord,
+  CURRENT_STICKER_VERSION,
+  coffeeCategories,
+  coffeeTypeMap,
+  getExactCoffeeMatch,
+  searchCoffeeTypes,
+} from "@/coffee-data";
 import { AuthGate } from "@/app/AuthGate";
-import { CoffeeCalendar } from "@/app/CoffeeCalendar";
+import { BrandLogo } from "@/app/BrandLogo";
+import { CoffeeCalendar, getLocalDayKey } from "@/app/CoffeeCalendar";
+import { useStickerBackfill } from "@/app/use-sticker-backfill";
 import { useCoffeeAuth } from "@/use-coffee-auth";
+import {
+  createSticker,
+  preloadStickerEngine,
+} from "./sticker";
 
 const tempOptions = ["热", "冰", "常温"];
 const sugarOptions = ["无糖", "微甜", "标准", "很甜"];
@@ -17,6 +30,7 @@ const quickVolumes = [
   { label: "大杯", ml: 360 },
   { label: "超大杯", ml: 480 },
 ];
+const NEW_RECORD_STICKER_DELAY_MS = 500;
 
 type TimeFilter = "all" | "week" | "month" | "year";
 
@@ -53,9 +67,9 @@ export default function MobilePage() {
     getAuthHeaders,
     signOut,
   } = auth;
+  const activeRecordsOwner = authUser?.id ?? (isAuthEnabled ? null : "local");
+  const activeRecordsOwnerRef = useRef(activeRecordsOwner);
   const [imageData, setImageData] = useState<string | null>(null);
-  const [stickerData, setStickerData] = useState<string | null>(null);
-  const [creatingSticker, setCreatingSticker] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [temp, setTemp] = useState<string | null>(null);
@@ -71,29 +85,48 @@ export default function MobilePage() {
   const [showResultCard, setShowResultCard] = useState(false);
   const [screen, setScreen] = useState<"entry" | "home">("entry");
   const [records, setRecords] = useState<CoffeeRecord[]>([]);
+  const [loadedRecordsOwner, setLoadedRecordsOwner] = useState<string | null>(null);
   const [surfaceChecked, setSurfaceChecked] = useState(false);
+  const photoRequestRef = useRef(0);
+  const recognitionRequestRef = useRef(0);
+  const recognitionAbortRef = useRef<AbortController | null>(null);
+  const refreshRequestRef = useRef(0);
 
   const refreshRecords = useCallback(async () => {
+    const requestId = ++refreshRequestRef.current;
+
     if (isAuthEnabled && !authUser) {
+      setLoadedRecordsOwner(null);
       setRecords([]);
       return;
     }
 
-    const headers = await getAuthHeaders();
-    const response = await fetch("/api/records", { cache: "no-store", headers });
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch("/api/records", { cache: "no-store", headers });
+      if (requestId !== refreshRequestRef.current) return;
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        setRecords([]);
-        setMessage("登录状态已失效，请重新登录。");
-        void signOut();
+      if (!response.ok) {
+        if (response.status === 401) {
+          setLoadedRecordsOwner(null);
+          setRecords([]);
+          setMessage("登录状态已失效，请重新登录。");
+          void signOut();
+        }
+        return;
       }
-      return;
-    }
 
-    const data = (await response.json()) as RecordsResponse;
-    setRecords(data.records);
-  }, [authUser, getAuthHeaders, isAuthEnabled, signOut]);
+      const data = (await response.json()) as RecordsResponse;
+      if (requestId !== refreshRequestRef.current) return;
+
+      setLoadedRecordsOwner(activeRecordsOwner);
+      setRecords((current) => mergeRefreshedRecords(data.records, current));
+    } catch {
+      if (requestId === refreshRequestRef.current) {
+        setMessage("图鉴同步失败，请稍后重试。");
+      }
+    }
+  }, [activeRecordsOwner, authUser, getAuthHeaders, isAuthEnabled, signOut]);
 
   const selectedCategory = useMemo(
     () => coffeeCategories.find((category) => category.id === selectedCategoryId) ?? null,
@@ -104,9 +137,25 @@ export default function MobilePage() {
   const recognitionApproved = Boolean(recognition?.provider === "openai" && recognition.isDrink) || manualConfirmed;
   const canContinueAfterRecognition =
     !recognizing && Boolean(imageData) && recognitionApproved;
-  const canSubmit = Boolean(canContinueAfterRecognition && selectedCoffee && Number(volumeMl) > 0 && !submitting);
+  const canSubmit = Boolean(
+    canContinueAfterRecognition &&
+    selectedCoffee &&
+    Number(volumeMl) > 0 &&
+    !submitting
+  );
   const shouldShowRecognitionCard = Boolean(imageData && recognition && !recognizing);
   const aiDetectedText = recognition ? getRecognitionDetectedText(recognition, manualConfirmed) : "";
+
+  const cancelRecognition = useCallback(() => {
+    recognitionRequestRef.current += 1;
+    recognitionAbortRef.current?.abort();
+    recognitionAbortRef.current = null;
+    setRecognizing(false);
+  }, []);
+
+  useEffect(() => {
+    activeRecordsOwnerRef.current = activeRecordsOwner;
+  }, [activeRecordsOwner]);
 
   useEffect(() => {
     const isPhoneWidth = window.matchMedia("(max-width: 760px)").matches;
@@ -124,43 +173,84 @@ export default function MobilePage() {
   useEffect(() => {
     if (!surfaceChecked) return;
 
+    photoRequestRef.current += 1;
+    recognitionRequestRef.current += 1;
+    recognitionAbortRef.current?.abort();
+    recognitionAbortRef.current = null;
+    refreshRequestRef.current += 1;
+
     const resetTimer = window.setTimeout(() => {
+      setLoadedRecordsOwner(null);
       setRecords([]);
       setLastRecord(null);
       setShowResultCard(false);
+      setRecognizing(false);
+      setRecognition(null);
+      setManualConfirmed(false);
     }, 0);
 
     return () => window.clearTimeout(resetTimer);
   }, [authUser?.id, isAuthEnabled, surfaceChecked]);
 
+  useEffect(() => {
+    if (!surfaceChecked || authLoading || (isAuthEnabled && !authUser)) return;
+
+    const refreshTimer = window.setTimeout(() => void refreshRecords(), 0);
+    return () => window.clearTimeout(refreshTimer);
+  }, [authLoading, authUser, isAuthEnabled, refreshRecords, surfaceChecked]);
+
+  const updateBackfilledRecord = useCallback((updatedRecord: CoffeeRecord) => {
+    setRecords((current) => current.map((record) => (
+      record.id === updatedRecord.id ? updatedRecord : record
+    )));
+    setLastRecord((current) => current?.id === updatedRecord.id ? updatedRecord : current);
+  }, []);
+
+  useStickerBackfill({
+    records,
+    activeOwner: activeRecordsOwner,
+    recordsReady: loadedRecordsOwner === activeRecordsOwner,
+    enabled: screen === "home" || (!imageData && !recognizing && !submitting && !showResultCard),
+    getAuthHeaders,
+    onUnauthorized: signOut,
+    onRecordUpdated: updateBackfilledRecord,
+  });
+
   const handlePhoto = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const requestId = ++photoRequestRef.current;
+    event.currentTarget.value = "";
+    cancelRecognition();
     setMessage("正在压缩照片...");
-    const compressed = await compressImage(file);
-    setImageData(compressed);
-    setStickerData(null);
-    setCreatingSticker(true);
-    setSelectedCategoryId(null);
-    setSelectedTypeId(null);
-    setSearchTerm("");
-    setRecognition(null);
-    setManualConfirmed(false);
-    setLastRecord(null);
-    setShowResultCard(false);
-    void recognizeImage(compressed);
-    void createSticker(compressed).then((sticker) => {
-      setStickerData(sticker);
-      setCreatingSticker(false);
-    });
-    event.target.value = "";
+
+    try {
+      const compressed = await compressImage(file);
+
+      if (requestId !== photoRequestRef.current) return;
+
+      setImageData(compressed);
+      setSelectedCategoryId(null);
+      setSelectedTypeId(null);
+      setSearchTerm("");
+      setRecognition(null);
+      setManualConfirmed(false);
+      setLastRecord(null);
+      setShowResultCard(false);
+      void recognizeImage(compressed);
+      void preloadStickerEngine();
+    } catch {
+      if (requestId === photoRequestRef.current) {
+        setMessage("照片读取失败，请重新选择。");
+      }
+    }
   };
 
   const resetForm = () => {
+    photoRequestRef.current += 1;
+    cancelRecognition();
     setImageData(null);
-    setStickerData(null);
-    setCreatingSticker(false);
     setSelectedCategoryId(null);
     setSelectedTypeId(null);
     setSearchTerm("");
@@ -176,9 +266,9 @@ export default function MobilePage() {
   };
 
   const resetPhoto = () => {
+    photoRequestRef.current += 1;
+    cancelRecognition();
     setImageData(null);
-    setStickerData(null);
-    setCreatingSticker(false);
     setSelectedCategoryId(null);
     setSelectedTypeId(null);
     setSearchTerm("");
@@ -221,14 +311,19 @@ export default function MobilePage() {
   };
 
   const recognizeImage = async (photoData: string) => {
+    const requestId = ++recognitionRequestRef.current;
+    recognitionAbortRef.current?.abort();
+    const controller = new AbortController();
+    recognitionAbortRef.current = controller;
     setRecognizing(true);
     setMessage("");
 
-    const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 6_500);
 
     try {
       const authHeaders = await getAuthHeaders();
+      if (requestId !== recognitionRequestRef.current) return;
+
       const response = await fetch("/api/recognize", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
@@ -237,6 +332,8 @@ export default function MobilePage() {
       });
 
       const data = (await response.json()) as RecognitionResult | { error?: string };
+      if (requestId !== recognitionRequestRef.current) return;
+
       const errorMessage = "error" in data ? data.error : undefined;
 
       if (response.status === 401) {
@@ -264,17 +361,64 @@ export default function MobilePage() {
       setRecognition(recognitionData);
       setManualConfirmed(false);
     } catch {
+      if (requestId !== recognitionRequestRef.current) return;
+
       setRecognition(createManualRecognition("AI 识别请求失败，请人工确认这张照片是否为饮品。"));
       setManualConfirmed(false);
       setMessage("");
     } finally {
       window.clearTimeout(timeout);
-      setRecognizing(false);
+      if (requestId === recognitionRequestRef.current) {
+        recognitionAbortRef.current = null;
+        setRecognizing(false);
+      }
     }
   };
 
+  const attachStickerToRecord = useCallback(async (
+    recordId: string,
+    photoData: string,
+    recordsOwner: string | null
+  ) => {
+    try {
+      if (activeRecordsOwnerRef.current !== recordsOwner) return;
+
+      const generation = await createSticker(photoData);
+      if (!generation.sticker) return;
+      if (activeRecordsOwnerRef.current !== recordsOwner) return;
+
+      const authHeaders = await getAuthHeaders();
+      if (activeRecordsOwnerRef.current !== recordsOwner) return;
+
+      const response = await fetch("/api/records", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({
+          id: recordId,
+          stickerData: generation.sticker,
+          stickerVersion: CURRENT_STICKER_VERSION,
+        }),
+      });
+
+      if (!response.ok) return;
+
+      const data = (await response.json()) as { record: CoffeeRecord };
+      if (activeRecordsOwnerRef.current !== recordsOwner) return;
+
+      setRecords((current) => current.map((record) => (
+        record.id === data.record.id ? data.record : record
+      )));
+      setLastRecord((current) => current?.id === data.record.id ? data.record : current);
+    } catch (error) {
+      console.warn("[Coffee-Dex] Background sticker update failed:", error);
+    }
+  }, [getAuthHeaders]);
+
   const submit = async () => {
     if (!canSubmit || !selectedCoffee || !imageData) return;
+
+    const photoData = imageData;
+    const recordsOwner = activeRecordsOwner;
 
     try {
       setSubmitting(true);
@@ -288,8 +432,7 @@ export default function MobilePage() {
         body: JSON.stringify({
           coffeeType: selectedCoffee.id,
           coffeeName: displayName,
-          imageData,
-          stickerData: stickerData ?? undefined,
+          imageData: photoData,
           volumeMl: Number(volumeMl),
           temp,
           sugar,
@@ -307,11 +450,16 @@ export default function MobilePage() {
       }
 
       const data = (await response.json()) as { record: CoffeeRecord };
+      if (activeRecordsOwnerRef.current !== recordsOwner) return;
+
+      setLoadedRecordsOwner(recordsOwner);
       setLastRecord(data.record);
       setRecords((current) => [data.record, ...current.filter((record) => record.id !== data.record.id)]);
       setShowResultCard(true);
       setMessage("");
-      void refreshRecords();
+      window.setTimeout(() => {
+        void attachStickerToRecord(data.record.id, photoData, recordsOwner);
+      }, NEW_RECORD_STICKER_DELAY_MS);
     } catch {
       setMessage("网络异常，提交失败，请重试。");
     } finally {
@@ -321,6 +469,7 @@ export default function MobilePage() {
 
   const openHome = () => {
     setShowResultCard(false);
+    setMessage("");
     setScreen("home");
     void refreshRecords();
   };
@@ -358,8 +507,13 @@ export default function MobilePage() {
 
       <div className="m-app">
         <header className="m-header">
-          <h1>Coffee-Dex</h1>
-          <p className="sub">记录每一杯，点亮你的图鉴</p>
+          <div className="m-entry-brand">
+            <BrandLogo className="m-entry-brand-logo" sizes="56px" preload />
+            <div className="m-entry-brand-copy">
+              <h1>Coffee-Dex</h1>
+              <p className="sub">记录每一杯，点亮你的图鉴</p>
+            </div>
+          </div>
           {isAuthEnabled && authUser?.email && (
             <div className="m-entry-account">
               <span>{authUser.email}</span>
@@ -602,8 +756,8 @@ export default function MobilePage() {
         />
       )}
 
-      <div className={`m-toast ${message || creatingSticker ? "show" : ""}`}>
-        {message || (creatingSticker ? "正在生成贴纸..." : "")}
+      <div className={`m-toast ${message ? "show" : ""}`}>
+        {message}
       </div>
     </main>
   );
@@ -654,7 +808,12 @@ function MobileHome({
   const [selectedSubtype, setSelectedSubtype] = useState("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [timeFilterOpen, setTimeFilterOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<CoffeeRecord | null>(null);
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [calendarCursor, setCalendarCursor] = useState(() => {
+    const current = new Date();
+    return new Date(current.getFullYear(), current.getMonth(), 1);
+  });
   const [now, setNow] = useState(0);
 
   useEffect(() => {
@@ -671,6 +830,18 @@ function MobileHome({
   const selectedCategory = useMemo(
     () => coffeeCategories.find((category) => category.id === selectedCategoryId) ?? null,
     [selectedCategoryId]
+  );
+  const selectedRecord = useMemo(
+    () => records.find((record) => record.id === selectedRecordId) ?? null,
+    [records, selectedRecordId]
+  );
+  const selectedDayRecords = useMemo(
+    () => selectedDayKey
+      ? records
+          .filter((record) => getLocalDayKey(new Date(record.timestamp)) === selectedDayKey)
+          .sort((a, b) => b.timestamp - a.timestamp)
+      : [],
+    [records, selectedDayKey]
   );
 
   const totalCaffeine = useMemo(() => records.reduce((sum, record) => sum + record.caffeine, 0), [records]);
@@ -691,12 +862,35 @@ function MobileHome({
   }, [now, records]);
 
   const openCategory = (categoryId: string) => {
+    setSelectedDayKey(null);
     setSelectedCategoryId(categoryId);
     setSelectedSubtype("all");
     setTimeFilter("all");
     setTimeFilterOpen(false);
-    setSelectedRecord(null);
+    setSelectedRecordId(null);
   };
+
+  const openDay = (dayKey: string) => {
+    setSelectedCategoryId(null);
+    setSelectedDayKey(dayKey);
+    setSelectedRecordId(null);
+  };
+
+  if (selectedDayKey) {
+    return (
+      <MobileDayRecords
+        dayKey={selectedDayKey}
+        records={selectedDayRecords}
+        selectedRecord={selectedRecord}
+        onBack={() => {
+          setSelectedDayKey(null);
+          setSelectedRecordId(null);
+        }}
+        onOpenRecord={(record) => setSelectedRecordId(record.id)}
+        onCloseRecord={() => setSelectedRecordId(null)}
+      />
+    );
+  }
 
   if (selectedCategory) {
     const subtypeRecords = records.filter(
@@ -725,7 +919,7 @@ function MobileHome({
                   setSelectedSubtype("all");
                   setTimeFilter("all");
                   setTimeFilterOpen(false);
-                  setSelectedRecord(null);
+                  setSelectedRecordId(null);
                 }}
                 aria-label="返回手机首页"
               >
@@ -779,7 +973,7 @@ function MobileHome({
           <div className="m-cat-detail-grid">
             {visibleRecords.length ? (
               visibleRecords.map((record) => (
-                <MobileRecordCard key={record.id} record={record} onClick={() => setSelectedRecord(record)} />
+                <MobileRecordCard key={record.id} record={record} onClick={() => setSelectedRecordId(record.id)} />
               ))
             ) : (
               <div className="m-cat-detail-empty">这里还没有记录哦</div>
@@ -787,7 +981,7 @@ function MobileHome({
           </div>
         </div>
 
-        {selectedRecord && <MobileDetailPopup record={selectedRecord} onClose={() => setSelectedRecord(null)} />}
+        {selectedRecord && <MobileDetailPopup record={selectedRecord} onClose={() => setSelectedRecordId(null)} />}
       </main>
     );
   }
@@ -798,6 +992,7 @@ function MobileHome({
         <div className="m-home-header-bar">
           <div className="m-home-header-top">
             <div className="m-home-brand">
+              <BrandLogo className="m-home-brand-logo" sizes="32px" preload />
               <span className="m-home-brand-text">Coffee-Dex</span>
             </div>
             <div className="m-home-version">打工人の咖啡因图鉴</div>
@@ -811,7 +1006,13 @@ function MobileHome({
           </div>
         </div>
 
-        <CoffeeCalendar records={records} compact onOpenRecord={setSelectedRecord} />
+        <CoffeeCalendar
+          records={records}
+          compact
+          onOpenDay={openDay}
+          monthCursor={calendarCursor}
+          onMonthCursorChange={setCalendarCursor}
+        />
 
         <div className="m-home-section-title">
           <span>咖啡图鉴</span>
@@ -850,9 +1051,59 @@ function MobileHome({
               退出登录
             </button>
           )}
+          <a className="m-open-source-link" href="/legal/third-party-notices.txt" target="_blank" rel="noreferrer">
+            开源许可
+          </a>
         </div>
       </div>
-      {selectedRecord && <MobileDetailPopup record={selectedRecord} onClose={() => setSelectedRecord(null)} />}
+      {selectedRecord && <MobileDetailPopup record={selectedRecord} onClose={() => setSelectedRecordId(null)} />}
+    </main>
+  );
+}
+
+function MobileDayRecords({
+  dayKey,
+  records,
+  selectedRecord,
+  onBack,
+  onOpenRecord,
+  onCloseRecord,
+}: {
+  dayKey: string;
+  records: CoffeeRecord[];
+  selectedRecord: CoffeeRecord | null;
+  onBack: () => void;
+  onOpenRecord: (record: CoffeeRecord) => void;
+  onCloseRecord: () => void;
+}) {
+  return (
+    <main className="mobile-view">
+      <div className="m-cat-detail-overlay active">
+        <div className="m-cat-detail-header">
+          <div className="m-cat-detail-header-top">
+            <button type="button" className="m-cat-detail-back" onClick={onBack} aria-label="返回手机首页">
+              <ChevronLeft size={18} />
+            </button>
+            <div className="m-cat-detail-title-wrap">
+              <div className="m-cat-detail-title">{formatDayLabel(dayKey)}</div>
+              <div className="m-cat-detail-en">Coffee log</div>
+            </div>
+            <div className="m-cat-detail-count-inline">{records.length}杯</div>
+          </div>
+        </div>
+
+        <div className="m-cat-detail-grid">
+          {records.length ? (
+            records.map((record) => (
+              <MobileRecordCard key={record.id} record={record} onClick={() => onOpenRecord(record)} />
+            ))
+          ) : (
+            <div className="m-cat-detail-empty">当天暂无记录</div>
+          )}
+        </div>
+      </div>
+
+      {selectedRecord && <MobileDetailPopup record={selectedRecord} onClose={onCloseRecord} />}
     </main>
   );
 }
@@ -913,7 +1164,7 @@ function MobileRecordCard({ record, onClick }: { record: CoffeeRecord; onClick: 
           <span>{record.volumeMl}ml</span>
           <span className="green">+{record.caffeine}mg</span>
         </span>
-        <span className="m-cat-detail-card-comment">“{record.toxicQuote}”</span>
+        <span className="m-cat-detail-card-comment">“{record.aiComment}”</span>
         <span className="m-cat-detail-card-date">{formatDateTime(record.timestamp)}</span>
       </span>
     </button>
@@ -982,7 +1233,6 @@ function ResultCard({
         </div>
         <div className="m-toxic-divider" />
         <div className="m-toxic-quote">{record.toxicQuote}</div>
-        <div className="m-toxic-comment">{record.aiComment}</div>
         <div className="m-toxic-actions">
           <button type="button" className="m-toxic-secondary-btn" onClick={onClose}>
             关闭
@@ -1065,6 +1315,37 @@ function formatDateTime(timestamp: number) {
   });
 }
 
+function formatDayLabel(dayKey: string) {
+  const [year, monthIndex, day] = dayKey.split("-").map(Number);
+
+  return `${year}年${monthIndex + 1}月${day}日`;
+}
+
+function mergeRefreshedRecords(incoming: CoffeeRecord[], current: CoffeeRecord[]) {
+  const currentById = new Map(current.map((record) => [record.id, record]));
+
+  return incoming.map((record) => {
+    const existing = currentById.get(record.id);
+
+    if (
+      existing?.stickerData &&
+      (existing.stickerVersion ?? 0) >= CURRENT_STICKER_VERSION &&
+      (
+        !record.stickerData ||
+        (record.stickerVersion ?? 0) < (existing.stickerVersion ?? 0)
+      )
+    ) {
+      return {
+        ...record,
+        stickerData: existing.stickerData,
+        stickerVersion: existing.stickerVersion,
+      };
+    }
+
+    return record;
+  });
+}
+
 function compressImage(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -1095,86 +1376,5 @@ function compressImage(file: File) {
       image.src = String(reader.result);
     };
     reader.readAsDataURL(file);
-  });
-}
-
-async function createSticker(imageData: string) {
-  try {
-    const { removeBackground } = await import("@imgly/background-removal");
-    const blob = await removeBackground(imageData, {
-      model: "isnet_fp16",
-      output: { format: "image/png" },
-    });
-
-    return await trimTransparentSticker(blob);
-  } catch (error) {
-    console.warn("[Coffee-Dex] Sticker generation failed:", error);
-    return null;
-  }
-}
-
-async function trimTransparentSticker(blob: Blob) {
-  const bitmap = await createImageBitmap(blob);
-  const source = document.createElement("canvas");
-  source.width = bitmap.width;
-  source.height = bitmap.height;
-  const sourceContext = source.getContext("2d", { willReadFrequently: true });
-
-  if (!sourceContext) return blobToDataUrl(blob);
-
-  sourceContext.drawImage(bitmap, 0, 0);
-  const { data, width, height } = sourceContext.getImageData(0, 0, source.width, source.height);
-  let left = width;
-  let top = height;
-  let right = -1;
-  let bottom = -1;
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (data[(y * width + x) * 4 + 3] > 20) {
-        left = Math.min(left, x);
-        right = Math.max(right, x);
-        top = Math.min(top, y);
-        bottom = Math.max(bottom, y);
-      }
-    }
-  }
-
-  if (right < left || bottom < top) return blobToDataUrl(blob);
-
-  const padding = Math.max(10, Math.round(Math.max(right - left, bottom - top) * 0.06));
-  const cropWidth = right - left + 1;
-  const cropHeight = bottom - top + 1;
-  const longestSide = Math.max(cropWidth, cropHeight) + padding * 2;
-  const outputSize = Math.min(512, longestSide);
-  const scale = outputSize / longestSide;
-  const output = document.createElement("canvas");
-  output.width = Math.round((cropWidth + padding * 2) * scale);
-  output.height = Math.round((cropHeight + padding * 2) * scale);
-  const outputContext = output.getContext("2d");
-
-  if (!outputContext) return blobToDataUrl(blob);
-
-  outputContext.drawImage(
-    source,
-    left,
-    top,
-    cropWidth,
-    cropHeight,
-    Math.round(padding * scale),
-    Math.round(padding * scale),
-    Math.round(cropWidth * scale),
-    Math.round(cropHeight * scale)
-  );
-  bitmap.close();
-  return output.toDataURL("image/png");
-}
-
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("贴纸读取失败"));
-    reader.onload = () => resolve(String(reader.result));
-    reader.readAsDataURL(blob);
   });
 }

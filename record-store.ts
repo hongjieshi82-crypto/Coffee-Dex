@@ -11,6 +11,7 @@ interface RecordState {
 const storePath = path.join(process.cwd(), "data", "coffee-records.json");
 const userStoreRoot = path.join(process.cwd(), "data", "users");
 const cache = new Map<string, RecordState>();
+const mutationQueues = new Map<string, Promise<unknown>>();
 
 async function readState(userId?: string): Promise<RecordState> {
   const cacheKey = userId ?? "public";
@@ -59,27 +60,67 @@ export async function getRecordState(userId?: string) {
 }
 
 export async function addRecord(record: CoffeeRecord, userId?: string) {
-  const state = await readState(userId);
-  const nextState = {
-    records: [record, ...state.records],
-    updatedAt: Date.now(),
-  };
+  return enqueueMutation(userId, async () => {
+    const state = await readState(userId);
+    const nextState = {
+      records: [record, ...state.records],
+      updatedAt: Date.now(),
+    };
 
-  await writeState(nextState, userId);
+    await writeState(nextState, userId);
 
-  return nextState;
+    return nextState;
+  });
+}
+
+export async function updateRecordSticker(
+  id: string,
+  stickerData: string,
+  stickerVersion: number,
+  userId?: string
+) {
+  return enqueueMutation(userId, async () => {
+    const state = await readState(userId);
+    const existing = state.records.find((record) => record.id === id);
+
+    if (!existing) return null;
+
+    const record = { ...existing, stickerData, stickerVersion };
+    const nextState = {
+      records: state.records.map((current) => (current.id === id ? record : current)),
+      updatedAt: Date.now(),
+    };
+
+    await writeState(nextState, userId);
+
+    return { record, updatedAt: nextState.updatedAt };
+  });
 }
 
 export async function deleteRecord(id?: string | null, userId?: string) {
-  const state = await readState(userId);
-  const nextState = {
-    records: id ? state.records.filter((record) => record.id !== id) : [],
-    updatedAt: Date.now(),
-  };
+  return enqueueMutation(userId, async () => {
+    const state = await readState(userId);
+    const nextState = {
+      records: id ? state.records.filter((record) => record.id !== id) : [],
+      updatedAt: Date.now(),
+    };
 
-  await writeState(nextState, userId);
+    await writeState(nextState, userId);
 
-  return nextState;
+    return nextState;
+  });
+}
+
+function enqueueMutation<T>(userId: string | undefined, mutation: () => Promise<T>) {
+  const queueKey = userId ?? "public";
+  const previous = mutationQueues.get(queueKey) ?? Promise.resolve();
+  const result = previous.catch(() => undefined).then(mutation);
+  const tracked: Promise<T> = result.finally(() => {
+    if (mutationQueues.get(queueKey) === tracked) mutationQueues.delete(queueKey);
+  });
+  mutationQueues.set(queueKey, tracked);
+
+  return tracked;
 }
 
 function getStorePath(userId?: string) {

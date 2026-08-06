@@ -1,7 +1,8 @@
 "use client";
 
-import { Download, Share2, Smartphone, X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BrandLogo } from "@/app/BrandLogo";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -82,13 +83,11 @@ export function PwaInstallPrompt() {
 
   return (
     <div className="pwa-install-prompt" role="status">
-      <div className="pwa-install-icon" aria-hidden="true">
-        {showIosGuide ? <Share2 size={17} strokeWidth={2} /> : <Smartphone size={17} strokeWidth={2} />}
-      </div>
+      <BrandLogo className="pwa-install-logo" sizes="36px" />
       <div className="pwa-install-copy">
         <div className="pwa-install-title">桌面入口已就绪</div>
         <div className="pwa-install-text">
-          {showIosGuide ? "在 Safari 里点分享，再选添加到主屏幕。" : "把 Coffee-Dex 安装到手机桌面，打开时像 App 一样。"}
+          {showIosGuide ? "在 Safari 里点分享，再选“添加到主屏幕”。" : "把 Coffee-Dex 安装到手机桌面，打开时像 App 一样。"}
         </div>
       </div>
       {deferredPrompt && (

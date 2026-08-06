@@ -1,4 +1,4 @@
-import { CoffeeRecord } from "@/coffee-data";
+import { CoffeeRecord, CURRENT_STICKER_VERSION } from "@/coffee-data";
 import { getSupabaseAdmin } from "@/supabase-server";
 
 const storageBucket = process.env.SUPABASE_STORAGE_BUCKET ?? "coffee-photos";
@@ -42,7 +42,7 @@ export async function addSupabaseRecord(userId: string, record: CoffeeRecord) {
     ? await uploadRecordImage(userId, record.id, record.imageData)
     : { imageUrl: record.imageData ?? null, imagePath: null };
   const sticker = record.stickerData?.startsWith("data:image/")
-    ? await uploadRecordImage(userId, `${record.id}-sticker`, record.stickerData)
+    ? await uploadRecordImage(userId, `${record.id}-sticker-v${CURRENT_STICKER_VERSION}`, record.stickerData)
     : { imageUrl: record.stickerData ?? null, imagePath: null };
 
   const { data, error } = await supabase
@@ -73,6 +73,49 @@ export async function addSupabaseRecord(userId: string, record: CoffeeRecord) {
   return mapRecordRow(data as CoffeeRecordRow);
 }
 
+export async function updateSupabaseRecordSticker(
+  userId: string,
+  id: string,
+  stickerData: string,
+  stickerVersion: number
+) {
+  const supabase = requireSupabaseAdmin();
+  const { data: existing, error: findError } = await supabase
+    .from("coffee_records")
+    .select("id,sticker_path,sticker_url")
+    .eq("user_id", userId)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (findError) throw findError;
+  if (!existing) return null;
+
+  const oldStickerPath = existing.sticker_path ?? getStoragePathFromUrl(existing.sticker_url);
+  const sticker = await uploadRecordImage(userId, `${id}-sticker-v${stickerVersion}`, stickerData);
+  const { data, error } = await supabase
+    .from("coffee_records")
+    .update({
+      sticker_url: sticker.imageUrl,
+      sticker_path: sticker.imagePath,
+    })
+    .eq("user_id", userId)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (data && oldStickerPath !== sticker.imagePath && isStoragePathOwnedByUser(userId, oldStickerPath)) {
+    const { error: cleanupError } = await supabase.storage.from(storageBucket).remove([oldStickerPath]);
+
+    if (cleanupError) {
+      console.warn("[Coffee-Dex] Supabase old sticker cleanup failed:", cleanupError);
+    }
+  }
+
+  return data ? mapRecordRow(data as CoffeeRecordRow) : null;
+}
+
 export async function deleteSupabaseRecord(userId: string, id?: string | null) {
   const supabase = requireSupabaseAdmin();
 
@@ -80,7 +123,7 @@ export async function deleteSupabaseRecord(userId: string, id?: string | null) {
     const existing = await getSupabaseRecords(userId);
     const imagePaths = existing
       .flatMap((record) => [getStoragePathFromUrl(record.imageData), getStoragePathFromUrl(record.stickerData)])
-      .filter((path): path is string => Boolean(path));
+      .filter((path): path is string => isStoragePathOwnedByUser(userId, path));
 
     await supabase.from("coffee_records").delete().eq("user_id", userId);
     if (imagePaths.length) await supabase.storage.from(storageBucket).remove(imagePaths);
@@ -102,7 +145,7 @@ export async function deleteSupabaseRecord(userId: string, id?: string | null) {
   const imagePaths = [
     existing?.image_path ?? getStoragePathFromUrl(existing?.image_url),
     existing?.sticker_path ?? getStoragePathFromUrl(existing?.sticker_url),
-  ].filter((path): path is string => Boolean(path));
+  ].filter((path): path is string => isStoragePathOwnedByUser(userId, path));
   if (imagePaths.length) await supabase.storage.from(storageBucket).remove(imagePaths);
 
   return getSupabaseRecords(userId);
@@ -169,6 +212,7 @@ function mapRecordRow(row: CoffeeRecordRow): CoffeeRecord {
     volumeMl: row.volume_ml,
     imageData: row.image_url ?? row.image_data ?? undefined,
     stickerData: row.sticker_url ?? undefined,
+    stickerVersion: getStoredStickerVersion(row.sticker_url),
     caffeine: row.caffeine,
     temp: row.temp,
     sugar: row.sugar,
@@ -178,6 +222,13 @@ function mapRecordRow(row: CoffeeRecordRow): CoffeeRecord {
   };
 }
 
+function getStoredStickerVersion(stickerUrl?: string | null) {
+  if (!stickerUrl) return undefined;
+
+  const match = stickerUrl.match(/-sticker-v(\d+)\.png(?:\?|$)/);
+  return match ? Number(match[1]) : 1;
+}
+
 function getStoragePathFromUrl(value?: string | null) {
   if (!value) return null;
 
@@ -185,4 +236,8 @@ function getStoragePathFromUrl(value?: string | null) {
   const index = value.indexOf(marker);
 
   return index >= 0 ? decodeURIComponent(value.slice(index + marker.length)) : null;
+}
+
+function isStoragePathOwnedByUser(userId: string, path?: string | null): path is string {
+  return typeof path === "string" && path.startsWith(`${userId}/`);
 }

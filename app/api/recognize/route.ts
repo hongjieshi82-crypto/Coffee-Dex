@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLocalRequestUser } from "@/local-auth";
 import { getRequestUser, isSupabaseAuthConfigured } from "@/supabase-server";
+import { decodeSourceImageDataUrl, MAX_SOURCE_IMAGE_DATA_URL_LENGTH } from "@/image-data-url";
+import { readJsonWithLimit } from "@/server-json";
 
 export const runtime = "nodejs";
+
+const maxRecognitionRequestBytes = MAX_SOURCE_IMAGE_DATA_URL_LENGTH + 8 * 1024;
 
 interface RecognitionResult {
   isDrink: boolean;
@@ -38,12 +42,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "请先登录后使用 AI 识别。" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
-  const imageData = body?.imageData;
+  const bodyResult = await readJsonWithLimit(request, maxRecognitionRequestBytes);
 
-  if (typeof imageData !== "string" || !imageData.startsWith("data:image/")) {
-    return NextResponse.json({ error: "缺少图片 data URL" }, { status: 400 });
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.error === "too-large" ? "上传图片过大，请换一张照片后重试。" : "请求内容不合法。" },
+      { status: bodyResult.error === "too-large" ? 413 : 400 }
+    );
   }
+
+  const body = bodyResult.value as Record<string, unknown> | null;
+  const sourceImage = body && typeof body === "object" && !Array.isArray(body)
+    ? decodeSourceImageDataUrl(body.imageData)
+    : null;
+
+  if (!sourceImage) {
+    return NextResponse.json({ error: "图片必须是不超过 4 MB 的 JPEG、PNG 或 WebP 文件。" }, { status: 400 });
+  }
+
+  const imageData = sourceImage.dataUrl;
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({

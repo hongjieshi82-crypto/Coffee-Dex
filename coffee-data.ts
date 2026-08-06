@@ -13,6 +13,8 @@ export interface CoffeeCategory {
   items: CoffeeType[];
 }
 
+export const CURRENT_STICKER_VERSION = 4;
+
 export interface CoffeeRecord {
   id: string;
   coffeeType: string;
@@ -21,6 +23,7 @@ export interface CoffeeRecord {
   volumeMl: number;
   imageData?: string;
   stickerData?: string;
+  stickerVersion?: number;
   caffeine: number;
   temp?: string | null;
   sugar?: string | null;

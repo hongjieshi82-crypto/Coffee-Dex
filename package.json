@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:lan": "next dev -H 0.0.0.0",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "dev:lan": "next dev --webpack -H 0.0.0.0",
+    "build": "next build --webpack",
     "start": "next start",
     "start:lan": "next start -H 0.0.0.0",
     "share": "npx -y cloudflared tunnel --url http://localhost:3000",

@@ -35,7 +35,7 @@ Coffee-Dex 是一个游戏化的咖啡图鉴 Web 应用，专为打工人生存�
 
 ## 快速开始
 
-### 方式一：直接打开 HTML（推荐）
+### 方式一：直接打开 HTML（旧版预览）
 
 最简单的方式，无需安装任何依赖：
 
@@ -50,7 +50,7 @@ Coffee-Dex 是一个游戏化的咖啡图鉴 Web 应用，专为打工人生存�
    open coffee-dex.html
    ```
 
-### 方式二：运行 Next.js 版本
+### 方式二：运行 Next.js 版本（推荐）
 
 需要 Node.js 环境：
 
@@ -120,9 +120,13 @@ Coffee-Dex/
 
 ## 技术栈
 
-- **前端**：HTML5 + CSS3 + Vanilla JavaScript / Next.js 15 + TypeScript
+- **前端**：HTML5 + CSS3 + Vanilla JavaScript / Next.js 16 + TypeScript
 - **后端**：Supabase（PostgreSQL + Auth）
 - **样式**：玻璃拟态 + 响应式设计
+
+## 第三方许可
+
+浏览器端贴纸抠图使用 `@imgly/background-removal@1.7.0`，该组件采用 GNU AGPL v3 许可。完整许可证、第三方依赖清单和上游源码地址随应用发布在 `public/legal/`，线上页脚也提供了访问入口。
 
 ## 数据库设置
 

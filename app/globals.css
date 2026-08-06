@@ -93,17 +93,15 @@ body {
   -webkit-backdrop-filter: blur(24px);
 }
 
-.auth-gate-icon {
-  display: inline-flex;
-  width: 56px;
-  height: 56px;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-  border: 1px solid rgba(195,159,118,0.2);
-  border-radius: 18px;
-  background: rgba(195,159,118,0.1);
-  color: #C39F76;
+.auth-gate-logo {
+  display: block;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 12px;
+  border-radius: 20px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.28));
+  user-select: none;
 }
 
 .auth-gate-card h1 {
@@ -367,6 +365,24 @@ body {
 
 .pc-view .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+.pc-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.pc-brand-logo {
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 12px rgba(0,0,0,0.28));
+  user-select: none;
 }
 
 @keyframes pc-breathe {
@@ -790,6 +806,21 @@ body {
   transition: all 0.25s;
 }
 
+.pc-view .record-card-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pc-view .record-card-open:focus-visible {
+  outline: 2px solid rgba(195, 159, 118, 0.82);
+  outline-offset: -3px;
+}
+
 .pc-view .record-card:hover {
   transform: translateY(-3px);
   border-color: rgba(195,159,118,0.25);
@@ -917,7 +948,8 @@ body {
   transition: all 0.2s;
 }
 
-.pc-view .record-card:hover .record-card-del {
+.pc-view .record-card:hover .record-card-del,
+.pc-view .record-card:focus-within .record-card-del {
   opacity: 1;
 }
 
@@ -1318,6 +1350,28 @@ body {
   margin-bottom: 28px;
   flex-shrink: 0;
   animation: m-fadeDown 0.6s ease both;
+}
+
+.m-entry-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.m-entry-brand-logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  object-fit: contain;
+  filter: drop-shadow(0 7px 16px rgba(0,0,0,0.28));
+  user-select: none;
+}
+
+.m-entry-brand-copy {
+  min-width: 0;
+  text-align: left;
 }
 
 .m-header h1 {
@@ -2192,6 +2246,11 @@ body {
 }
 
 .pwa-install-prompt {
+  --bg: #1a1612;
+  --text: #f5efe6;
+  --latte: #c39f76;
+  --latte-light: #d4b99a;
+  --accent: #e8a87c;
   position: fixed;
   right: max(14px, env(safe-area-inset-right));
   bottom: max(16px, env(safe-area-inset-bottom));
@@ -2213,17 +2272,15 @@ body {
   -webkit-backdrop-filter: blur(18px);
 }
 
-.pwa-install-icon {
-  display: flex;
+.pwa-install-logo {
+  display: block;
   width: 36px;
   height: 36px;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  border: 1px solid rgba(195,159,118,0.2);
   border-radius: 12px;
-  background: rgba(195,159,118,0.12);
-  color: var(--latte-light);
+  object-fit: contain;
+  filter: drop-shadow(0 4px 9px rgba(0,0,0,0.26));
+  user-select: none;
 }
 
 .pwa-install-copy {
@@ -2483,13 +2540,6 @@ body {
   opacity: 0.3;
 }
 
-.m-toxic-comment {
-  margin-bottom: 14px;
-  color: rgba(245,239,230,0.42);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 .m-toxic-actions {
   display: grid;
   grid-template-columns: 0.8fr 1.2fr;
@@ -2568,6 +2618,17 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.m-home-brand-logo {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.24));
+  user-select: none;
 }
 
 .m-home-brand-text {
@@ -2804,6 +2865,17 @@ body {
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.m-open-source-link {
+  align-self: center;
+  color: rgba(255,255,255,0.28);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.m-open-source-link:active {
+  color: rgba(255,255,255,0.5);
 }
 
 .m-cat-detail-overlay {
@@ -3434,7 +3506,7 @@ body {
   position: relative;
   display: flex;
   min-width: 0;
-  min-height: 92px;
+  min-height: 100px;
   flex-direction: column;
   align-items: center;
   padding: 8px 5px 5px;
@@ -3464,6 +3536,8 @@ body {
 }
 
 .coffee-calendar-number {
+  position: relative;
+  z-index: 3;
   align-self: flex-start;
   color: rgba(245, 239, 230, 0.5);
   font-size: 11px;
@@ -3475,19 +3549,25 @@ body {
 }
 
 .coffee-calendar-sticker-wrap {
-  position: relative;
+  position: absolute;
+  top: 18px;
+  right: 4px;
+  bottom: 3px;
+  left: 4px;
   display: flex;
-  width: 58px;
-  height: 58px;
+  width: auto;
+  height: auto;
   align-items: center;
   justify-content: center;
-  margin-top: 3px;
+  margin: 0;
+  pointer-events: none;
 }
 
 .coffee-calendar-sticker {
   display: block;
-  width: 54px;
-  height: 54px;
+  width: min(82px, 100%);
+  height: min(82px, 100%);
+  border: 0;
   object-fit: contain;
   background: transparent;
   box-shadow: none;
@@ -3496,20 +3576,32 @@ body {
 }
 
 .coffee-calendar-day:nth-child(3n) .coffee-calendar-sticker {
-  transform: rotate(5deg) scale(0.9);
+  transform: rotate(5deg) scale(0.96);
 }
 
-.coffee-calendar-placeholder {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--latte);
+.coffee-calendar-photo-pending {
+  width: min(78px, 100%);
+  height: min(78px, 100%);
+  border-radius: 46% 54% 49% 51%;
+  object-fit: cover;
+  opacity: 0.72;
+  filter: saturate(0.78) drop-shadow(0 3px 4px rgba(0, 0, 0, 0.32));
+  -webkit-mask-image: radial-gradient(ellipse 68% 72% at 50% 50%, #000 52%, transparent 100%);
+  mask-image: radial-gradient(ellipse 68% 72% at 50% 50%, #000 52%, transparent 100%);
+}
+
+.coffee-calendar-sticker-pending {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(195, 159, 118, 0.12);
 }
 
 .coffee-calendar-count {
   position: absolute;
-  top: -2px;
-  right: -3px;
+  z-index: 2;
+  top: 6px;
+  right: 6px;
   min-width: 19px;
   height: 19px;
   padding: 0 5px;
@@ -3572,7 +3664,7 @@ body {
 }
 
 .coffee-calendar-compact .coffee-calendar-day {
-  min-height: 58px;
+  min-height: 64px;
   padding: 6px 3px 3px;
   border-radius: 10px;
 }
@@ -3582,20 +3674,27 @@ body {
 }
 
 .coffee-calendar-compact .coffee-calendar-sticker-wrap {
-  width: 36px;
-  height: 36px;
-  margin-top: 1px;
+  top: 15px;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  width: auto;
+  height: auto;
 }
 
 .coffee-calendar-compact .coffee-calendar-sticker {
-  width: 34px;
-  height: 34px;
-  border-width: 2px;
+  width: min(46px, 100%);
+  height: min(46px, 100%);
+}
+
+.coffee-calendar-compact .coffee-calendar-photo-pending {
+  width: min(44px, 100%);
+  height: min(44px, 100%);
 }
 
 .coffee-calendar-compact .coffee-calendar-count {
-  top: -3px;
-  right: -5px;
+  top: 4px;
+  right: 4px;
   min-width: 16px;
   height: 16px;
   font-size: 9px;
@@ -3620,6 +3719,77 @@ body {
 @media (max-width: 760px) {
   .coffee-calendar:not(.coffee-calendar-compact) {
     margin: 0 16px;
+  }
+}
+
+@media (max-width: 340px) {
+  .m-entry-brand {
+    gap: 10px;
+  }
+
+  .m-entry-brand-logo {
+    width: 50px;
+    height: 50px;
+  }
+
+  .m-home-header-top {
+    gap: 8px;
+  }
+
+  .m-home-brand {
+    gap: 6px;
+  }
+
+  .m-home-brand-logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  .m-home-brand-text {
+    font-size: 20px;
+  }
+
+  .m-home-version {
+    font-size: 10px;
+  }
+
+  .coffee-calendar-compact {
+    margin-right: 8px;
+    margin-left: 8px;
+    padding: 14px 8px;
+  }
+
+  .coffee-calendar-compact .coffee-calendar-weekdays,
+  .coffee-calendar-compact .coffee-calendar-grid {
+    gap: 4px;
+  }
+
+  .coffee-calendar-compact .coffee-calendar-day {
+    min-height: 60px;
+  }
+
+  .coffee-calendar-compact .coffee-calendar-sticker-wrap {
+    top: 16px;
+    right: 1px;
+    bottom: 1px;
+    left: 1px;
+    width: auto;
+    height: auto;
+  }
+
+  .coffee-calendar-compact .coffee-calendar-sticker {
+    width: min(36px, 100%);
+    height: min(36px, 100%);
+  }
+
+  .coffee-calendar-compact .coffee-calendar-photo-pending {
+    width: min(34px, 100%);
+    height: min(34px, 100%);
+  }
+
+  .coffee-calendar-compact .coffee-calendar-count {
+    top: 3px;
+    right: 3px;
   }
 }
 

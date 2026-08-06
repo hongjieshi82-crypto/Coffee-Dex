@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Coffee, Lock, Mail } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
+import { BrandLogo } from "@/app/BrandLogo";
 import type { CoffeeAuth } from "@/use-coffee-auth";
 
 type AuthView = "password" | "email-code" | "signup" | "signup-code" | "forgot" | "reset-code";
@@ -99,14 +100,23 @@ export function AuthGate({ auth, surface = "pc" }: { auth: CoffeeAuth; surface?:
   const hasConfirmation = view === "signup" || view === "reset-code";
 
   if (auth.loading) {
-    return <main className={`auth-gate ${surface === "mobile" ? "mobile-view" : "pc-view"}`}><div className="auth-gate-bg" /><section className="auth-gate-card"><div className="auth-gate-icon"><Coffee size={28} /></div><h1>Coffee-Dex</h1><p>正在检查登录状态...</p></section></main>;
+    return (
+      <main className={`auth-gate ${surface === "mobile" ? "mobile-view" : "pc-view"}`}>
+        <div className="auth-gate-bg" />
+        <section className="auth-gate-card">
+          <BrandLogo className="auth-gate-logo" sizes="76px" preload />
+          <h1>Coffee-Dex</h1>
+          <p>正在检查登录状态...</p>
+        </section>
+      </main>
+    );
   }
 
   return (
     <main className={`auth-gate ${surface === "mobile" ? "mobile-view" : "pc-view"}`}>
       <div className="auth-gate-bg" />
       <section className="auth-gate-card">
-        <div className="auth-gate-icon"><Coffee size={28} strokeWidth={1.8} /></div>
+        <BrandLogo className="auth-gate-logo" sizes="76px" preload />
         <h1>Coffee-Dex</h1>
         <p>{codeViews.includes(view) ? codeTitle : title}</p>
 

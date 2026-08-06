@@ -25,7 +25,9 @@ import {
   coffeeTypeMap,
 } from "@/coffee-data";
 import { AuthGate } from "@/app/AuthGate";
-import { CoffeeCalendar } from "@/app/CoffeeCalendar";
+import { BrandLogo } from "@/app/BrandLogo";
+import { CoffeeCalendar, getLocalDayKey } from "@/app/CoffeeCalendar";
+import { useStickerBackfill } from "@/app/use-sticker-backfill";
 import { useCoffeeAuth } from "@/use-coffee-auth";
 
 interface RecordsResponse {
@@ -56,8 +58,11 @@ export default function Home() {
     getAuthHeaders,
     signOut,
   } = auth;
+  const activeRecordsOwner = authUser?.id ?? (isAuthEnabled ? null : "local");
   const [records, setRecords] = useState<CoffeeRecord[]>([]);
+  const [recordsOwner, setRecordsOwner] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [selectedSubtype, setSelectedSubtype] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all");
   const [shareUrl, setShareUrl] = useState("");
@@ -70,36 +75,86 @@ export default function Home() {
   const [galleryScale, setGalleryScale] = useState<"compact" | "balanced" | "large">("balanced");
   const initializedRef = useRef(false);
   const recordIdsRef = useRef<Set<string>>(new Set());
+  const recordBrowserRef = useRef<HTMLElement>(null);
+  const activeRecordsOwnerRef = useRef(activeRecordsOwner);
+  const refreshSequenceRef = useRef(0);
+  const lastAppliedRefreshRef = useRef(0);
+
+  useEffect(() => {
+    activeRecordsOwnerRef.current = activeRecordsOwner;
+  }, [activeRecordsOwner]);
 
   const refreshRecords = useCallback(async () => {
+    const requestId = ++refreshSequenceRef.current;
+    const requestOwner = activeRecordsOwner;
+
     if (isAuthEnabled && !authUser) {
+      setRecordsOwner(null);
       setRecords([]);
       return;
     }
 
-    const headers = await getAuthHeaders();
-    const response = await fetch("/api/records", { cache: "no-store", headers });
-    if (!response.ok) {
-      if (response.status === 401) {
-        setRecords([]);
-        void signOut();
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch("/api/records", { cache: "no-store", headers });
+
+      if (
+        activeRecordsOwnerRef.current !== requestOwner ||
+        requestId < lastAppliedRefreshRef.current
+      ) return;
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setRecordsOwner(null);
+          setRecords([]);
+          void signOut();
+        }
+        return;
       }
-      return;
+
+      const data = (await response.json()) as RecordsResponse;
+      if (
+        activeRecordsOwnerRef.current !== requestOwner ||
+        requestId < lastAppliedRefreshRef.current
+      ) return;
+
+      lastAppliedRefreshRef.current = requestId;
+      const incoming = data.records;
+
+      if (initializedRef.current) {
+        const newRecord = incoming.find((record) => !recordIdsRef.current.has(record.id));
+        if (newRecord) setReportRecord(newRecord);
+      } else {
+        initializedRef.current = true;
+      }
+
+      recordIdsRef.current = new Set(incoming.map((record) => record.id));
+      setRecordsOwner(requestOwner);
+      setRecords(incoming);
+    } catch (error) {
+      if (activeRecordsOwnerRef.current === requestOwner) {
+        console.warn("[Coffee-Dex] Desktop record refresh failed:", error);
+      }
     }
+  }, [activeRecordsOwner, authUser, getAuthHeaders, isAuthEnabled, signOut]);
 
-    const data = (await response.json()) as RecordsResponse;
-    const incoming = data.records;
+  const updateBackfilledRecord = useCallback((updatedRecord: CoffeeRecord) => {
+    setRecords((current) => current.map((record) => (
+      record.id === updatedRecord.id ? updatedRecord : record
+    )));
+    setDetailRecord((current) => current?.id === updatedRecord.id ? updatedRecord : current);
+    setReportRecord((current) => current?.id === updatedRecord.id ? updatedRecord : current);
+  }, []);
 
-    if (initializedRef.current) {
-      const newRecord = incoming.find((record) => !recordIdsRef.current.has(record.id));
-      if (newRecord) setReportRecord(newRecord);
-    } else {
-      initializedRef.current = true;
-    }
-
-    recordIdsRef.current = new Set(incoming.map((record) => record.id));
-    setRecords(incoming);
-  }, [authUser, getAuthHeaders, isAuthEnabled, signOut]);
+  useStickerBackfill({
+    records,
+    activeOwner: activeRecordsOwner,
+    recordsReady: recordsOwner === activeRecordsOwner,
+    enabled: true,
+    getAuthHeaders,
+    onUnauthorized: signOut,
+    onRecordUpdated: updateBackfilledRecord,
+  });
 
   useEffect(() => {
     const shouldOpenMobile = window.matchMedia("(max-width: 760px)").matches;
@@ -211,13 +266,23 @@ export default function Home() {
       })
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [now, records, selectedCategory, selectedSubtype, timeFilter]);
+  const selectedDayRecords = useMemo(() => {
+    if (!selectedDayKey) return [];
+
+    return records
+      .filter((record) => getLocalDayKey(new Date(record.timestamp)) === selectedDayKey)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [records, selectedDayKey]);
 
   useEffect(() => {
     initializedRef.current = false;
     recordIdsRef.current = new Set();
+    lastAppliedRefreshRef.current = refreshSequenceRef.current;
 
     const resetTimer = window.setTimeout(() => {
+      setRecordsOwner(null);
       setRecords([]);
+      setSelectedDayKey(null);
       setDetailRecord(null);
       setReportRecord(null);
       setHistoryOpen(false);
@@ -235,15 +300,27 @@ export default function Home() {
   };
 
   const openCategory = (categoryId: string) => {
+    setSelectedDayKey(null);
     setSelectedCategoryId(categoryId);
     setSelectedSubtype("all");
     setTimeFilter("all");
   };
 
   const backToCategories = () => {
+    setSelectedDayKey(null);
     setSelectedCategoryId(null);
     setSelectedSubtype("all");
     setTimeFilter("all");
+  };
+
+  const openDay = (dayKey: string) => {
+    setSelectedDayKey(dayKey);
+    setSelectedCategoryId(null);
+    setSelectedSubtype("all");
+    setTimeFilter("all");
+    window.requestAnimationFrame(() => {
+      recordBrowserRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   const deleteRecord = async (id: string) => {
@@ -278,9 +355,12 @@ export default function Home() {
 
       <div className="relative z-10 mx-auto max-w-7xl space-y-6 px-6 py-6">
         <header className="flex items-center justify-between pc-fade-down">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-latte">Coffee-Dex</h1>
-            <p className="text-xs text-white/40">职场咖啡图鉴 · 记录本</p>
+          <div className="pc-brand">
+            <BrandLogo className="pc-brand-logo" sizes="48px" preload />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-latte">Coffee-Dex</h1>
+              <p className="text-xs text-white/40">职场咖啡图鉴 · 记录本</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {isAuthEnabled && authUser && (
@@ -318,13 +398,17 @@ export default function Home() {
           />
         </section>
 
-        <CoffeeCalendar records={records} onOpenRecord={setDetailRecord} />
+        <CoffeeCalendar records={records} onOpenDay={openDay} />
 
-        <section className="w-full">
+        <section ref={recordBrowserRef} className="w-full scroll-mt-6">
           <div className="mb-6 flex items-center gap-3">
-            <h2 className="text-lg font-bold text-latte">咖啡图鉴</h2>
+            <h2 className="text-lg font-bold text-latte">
+              {selectedDayKey
+                ? `${formatDayKey(selectedDayKey)} · ${selectedDayRecords.length} 杯`
+                : "咖啡图鉴"}
+            </h2>
             <div className="h-px flex-1 bg-[linear-gradient(90deg,rgba(195,159,118,0.2),transparent)]" />
-            {!selectedCategory && records.length > 0 && (
+            {!selectedCategory && !selectedDayKey && records.length > 0 && (
               <span className="text-xs text-white/30">已录入 {records.length} 杯</span>
             )}
             {selectedCategory && (
@@ -344,7 +428,18 @@ export default function Home() {
             )}
           </div>
 
-          {selectedCategory ? (
+          {selectedDayKey ? (
+            <DayDetail
+              dayKey={selectedDayKey}
+              records={records}
+              visibleRecords={selectedDayRecords}
+              galleryScale={galleryScale}
+              onGalleryScaleChange={setGalleryScale}
+              onBack={backToCategories}
+              onOpenRecord={setDetailRecord}
+              onDeleteRecord={deleteRecord}
+            />
+          ) : selectedCategory ? (
             <CategoryDetail
               category={selectedCategory}
               records={records}
@@ -367,6 +462,9 @@ export default function Home() {
           <p className="mt-1 text-[10px] text-white/10">
             {isAuthEnabled ? "Supabase 云端同步 · 手机录入，PC 实时刷新" : "Next API 本地同步 · 手机录入，PC 实时刷新"}
           </p>
+          <a className="mt-2 inline-block text-[10px] text-white/20 hover:text-white/40" href="/legal/third-party-notices.txt" target="_blank" rel="noreferrer">
+            开源许可
+          </a>
         </footer>
       </div>
 
@@ -639,6 +737,67 @@ function CategoryDetail({
   );
 }
 
+function DayDetail({
+  dayKey,
+  records,
+  visibleRecords,
+  galleryScale,
+  onGalleryScaleChange,
+  onBack,
+  onOpenRecord,
+  onDeleteRecord,
+}: {
+  dayKey: string;
+  records: CoffeeRecord[];
+  visibleRecords: CoffeeRecord[];
+  galleryScale: "compact" | "balanced" | "large";
+  onGalleryScaleChange: (scale: "compact" | "balanced" | "large") => void;
+  onBack: () => void;
+  onOpenRecord: (record: CoffeeRecord) => void;
+  onDeleteRecord: (id: string) => void;
+}) {
+  return (
+    <section>
+      <div className="sub-header">
+        <button type="button" className="sub-back-btn" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          返回
+        </button>
+        <div className="sub-title">{formatDayKey(dayKey)} · {visibleRecords.length} 杯</div>
+        <span className="sub-en">当日记录</span>
+        <div className="gallery-scale-controls" aria-label="图鉴卡片大小">
+          <button type="button" title="缩小卡片" aria-label="缩小卡片" onClick={() => onGalleryScaleChange("compact")} className={galleryScale === "compact" ? "active" : ""}>
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" title="自适应卡片" aria-label="自适应卡片" onClick={() => onGalleryScaleChange("balanced")} className={galleryScale === "balanced" ? "active" : ""}>
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" title="放大卡片" aria-label="放大卡片" onClick={() => onGalleryScaleChange("large")} className={galleryScale === "large" ? "active" : ""}>
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className={`record-grid record-grid-${galleryScale}`}>
+        {visibleRecords.length ? (
+          visibleRecords.map((record, index) => (
+            <RecordCard
+              key={record.id}
+              record={record}
+              index={index}
+              count={records.filter((item) => item.coffeeType === record.coffeeType).length}
+              onOpen={() => onOpenRecord(record)}
+              onDelete={() => onDeleteRecord(record.id)}
+            />
+          ))
+        ) : (
+          <div className="gallery-empty">这一天还没有记录</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function RecordCard({
   record,
   index,
@@ -656,15 +815,18 @@ function RecordCard({
   const tags = [record.temp, record.sugar].filter(Boolean);
 
   return (
-    <article className="record-card card-enter" style={{ animationDelay: `${index * 0.06}s` }} onClick={onOpen}>
+    <article className="record-card card-enter" style={{ animationDelay: `${index * 0.06}s` }}>
+      <button
+        type="button"
+        className="record-card-open"
+        aria-label={`查看${record.coffeeName}详情`}
+        onClick={onOpen}
+      />
       <button
         type="button"
         className="record-card-del"
         title="删除"
-        onClick={(event) => {
-          event.stopPropagation();
-          onDelete();
-        }}
+        onClick={onDelete}
       >
         ×
       </button>
@@ -783,8 +945,8 @@ function ReportOverlay({
           </span>
         </div>
         <div>
-          <div className="mb-2 text-[11px] uppercase tracking-[2px] text-latte/50">AI 评语</div>
-          <div className="font-handwrite text-xl italic leading-7 text-latte/85">“{record.aiComment}”</div>
+          <div className="mb-2 text-[11px] uppercase tracking-[2px] text-latte/50">今日毒鸡汤</div>
+          <div className="font-handwrite text-xl italic leading-7 text-latte/85">“{record.toxicQuote}”</div>
         </div>
         <div className="mt-6 flex gap-3">
           <button type="button" onClick={onOpenDetail} className="flex-1 rounded-[14px] bg-[linear-gradient(135deg,var(--latte),#a67c52)] px-5 py-3.5 text-sm font-semibold text-coffee-black">
@@ -888,6 +1050,11 @@ function getYearStart(timestamp: number) {
 
 function formatDateTime(timestamp: number) {
   return new Date(timestamp).toLocaleString("zh-CN", { hour12: false });
+}
+
+function formatDayKey(dayKey: string) {
+  const [year, month, day] = dayKey.split("-");
+  return `${year}年${Number(month) + 1}月${day}日`;
 }
 
 function formatShortDate(timestamp: number) {
