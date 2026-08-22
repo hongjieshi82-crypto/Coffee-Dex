@@ -97,6 +97,29 @@ export async function updateRecordSticker(
   });
 }
 
+export async function updateRecordToxicQuote(
+  id: string,
+  toxicQuote: string,
+  userId?: string
+) {
+  return enqueueMutation(userId, async () => {
+    const state = await readState(userId);
+    const existing = state.records.find((record) => record.id === id);
+
+    if (!existing) return null;
+
+    const record = { ...existing, toxicQuote };
+    const nextState = {
+      records: state.records.map((current) => (current.id === id ? record : current)),
+      updatedAt: Date.now(),
+    };
+
+    await writeState(nextState, userId);
+
+    return { record, updatedAt: nextState.updatedAt };
+  });
+}
+
 export async function deleteRecord(id?: string | null, userId?: string) {
   return enqueueMutation(userId, async () => {
     const state = await readState(userId);

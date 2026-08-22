@@ -52,8 +52,8 @@ export function CoffeeCalendar({
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayKey = getLocalDayKey(new Date());
-  const cells = Array.from({ length: firstWeekday + daysInMonth }, (_, index) => {
-    if (index < firstWeekday) return null;
+  const cells = Array.from({ length: 42 }, (_, index) => {
+    if (index < firstWeekday || index >= firstWeekday + daysInMonth) return null;
     return index - firstWeekday + 1;
   });
 

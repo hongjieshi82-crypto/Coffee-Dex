@@ -1566,9 +1566,16 @@ body {
   line-height: 1.7;
 }
 
-.m-ai-confirm-btn {
-  width: 100%;
+.m-ai-status-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
   margin-top: 12px;
+}
+
+.m-ai-confirm-btn,
+.m-ai-retry-btn {
+  width: 100%;
   padding: 11px 14px;
   border: 1px solid rgba(195,159,118,0.25);
   border-radius: 14px;
@@ -1576,6 +1583,12 @@ body {
   color: var(--latte-light);
   font-size: 13px;
   font-weight: 700;
+}
+
+.m-ai-retry-btn {
+  border-color: rgba(245,239,230,0.12);
+  background: rgba(245,239,230,0.045);
+  color: rgba(245,239,230,0.58);
 }
 
 .m-search-section,
@@ -2304,13 +2317,17 @@ body {
   color: var(--latte-light);
   font-size: 14px;
   font-weight: 600;
+  opacity: 0;
   text-align: center;
   transform: translateX(-50%) translateY(100px);
-  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  transition:
+    transform 0.4s cubic-bezier(0.34,1.56,0.64,1),
+    opacity 0.25s ease;
   backdrop-filter: blur(10px);
 }
 
 .m-toast.show {
+  opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
@@ -2457,30 +2474,70 @@ body {
 .m-toxic-quote {
   position: relative;
   flex-shrink: 1;
-  margin-bottom: 12px;
+  margin-bottom: 9px;
   overflow: hidden;
+  padding: 2px 28px 2px 12px;
   color: var(--latte);
   font-family: 'Caveat', 'Segoe Script', cursive;
-  font-size: 19px;
+  font-size: 18px;
   font-style: italic;
-  line-height: 1.5;
+  line-height: 1.26;
   opacity: 0.9;
-  padding: 0 4px;
+  text-wrap: balance;
 }
 
 .m-toxic-quote::before {
   content: '\201C';
   position: absolute;
-  top: -10px;
-  left: -6px;
-  font-size: 36px;
+  top: -7px;
+  left: 0;
+  font-size: 30px;
   opacity: 0.3;
 }
 
 .m-toxic-quote::after {
   content: '\201D';
-  font-size: 36px;
+  position: absolute;
+  right: 4px;
+  bottom: -8px;
+  font-size: 30px;
   opacity: 0.3;
+}
+
+.m-toxic-quote > span {
+  display: block;
+}
+
+.m-toxic-refresh {
+  position: absolute;
+  z-index: 2;
+  top: -1px;
+  right: 0;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(195,159,118,0.18);
+  border-radius: 999px;
+  background: rgba(195,159,118,0.07);
+  color: rgba(195,159,118,0.58);
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.m-toxic-refresh:active:not(:disabled) {
+  background: rgba(195,159,118,0.14);
+  color: var(--latte-light);
+  transform: scale(0.92);
+}
+
+.m-toxic-refresh:disabled {
+  cursor: wait;
+}
+
+.m-toxic-refresh:disabled svg {
+  animation: m-spin 0.8s linear infinite;
 }
 
 .m-toxic-actions {
@@ -3733,6 +3790,314 @@ body {
   .coffee-calendar-compact .coffee-calendar-count {
     top: 3px;
     right: 3px;
+  }
+}
+
+/* Desktop uses two viewport-sized chapters: overview/calendar, then the catalog. */
+.pc-snap-shell {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(195, 159, 118, 0.28) transparent;
+}
+
+.pc-snap-page {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.pc-page-inner {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding-right: clamp(16px, 2.2vw, 28px);
+  padding-left: clamp(16px, 2.2vw, 28px);
+}
+
+.pc-overview-page {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 520px;
+  overflow: hidden;
+}
+
+.pc-overview-inner {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(7px, 1.35vh, 14px);
+  padding-top: clamp(10px, 1.8vh, 22px);
+  padding-bottom: clamp(12px, 2vh, 24px);
+}
+
+.pc-overview-header {
+  flex: 0 0 auto;
+}
+
+.pc-overview-panels {
+  flex: 0 0 auto;
+}
+
+.pc-overview-panels > * {
+  min-height: 0;
+}
+
+.pc-overview-page .pc-connection-copy,
+.pc-overview-page .pc-connection-device {
+  display: none;
+}
+
+.pc-overview-page .coffee-calendar {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  padding: clamp(10px, 1.8vh, 18px);
+  overflow: hidden;
+}
+
+.pc-overview-page .coffee-calendar h2 {
+  margin-top: 2px;
+  font-size: clamp(16px, 2.3vh, 20px);
+}
+
+.pc-overview-page .coffee-calendar-weekdays {
+  flex: 0 0 auto;
+  margin-top: clamp(6px, 1.4vh, 14px);
+}
+
+.pc-overview-page .coffee-calendar-grid {
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: clamp(4px, 0.8vh, 8px);
+  margin-top: clamp(4px, 0.8vh, 8px);
+}
+
+.pc-overview-page .coffee-calendar-day {
+  min-height: 0;
+  padding-top: clamp(4px, 0.8vh, 8px);
+}
+
+.pc-overview-page .coffee-calendar-note {
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+
+.pc-overview-page .coffee-calendar-sticker {
+  width: min(70px, 100%);
+  height: min(70px, 100%);
+}
+
+.pc-overview-page .coffee-calendar-photo-pending {
+  width: min(66px, 100%);
+  height: min(66px, 100%);
+}
+
+.pc-page-cue {
+  position: absolute;
+  z-index: 4;
+  right: 50%;
+  bottom: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(23, 19, 16, 0.82);
+  color: rgba(195, 159, 118, 0.52);
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transform: translateX(50%);
+  backdrop-filter: blur(12px);
+}
+
+.pc-page-cue-arrow {
+  color: var(--latte);
+  font-size: 16px;
+  line-height: 10px;
+  animation: pc-cue-bounce 1.7s ease-in-out infinite;
+}
+
+@keyframes pc-cue-bounce {
+  0%, 100% { transform: translateY(-1px); opacity: 0.45; }
+  50% { transform: translateY(3px); opacity: 1; }
+}
+
+.pc-catalog-page {
+  background: linear-gradient(180deg, rgba(195, 159, 118, 0.035), transparent 18%);
+}
+
+.pc-catalog-inner {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  padding-top: clamp(18px, 3vh, 34px);
+}
+
+.pc-catalog-inner > section {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.pc-catalog-page .cat-grid {
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.pc-catalog-page .cat-card {
+  min-height: 140px;
+}
+
+.pc-catalog-page footer {
+  flex: 0 0 auto;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.m-qr-login-loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  width: min(82vw, 310px);
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 26px 20px;
+  border: 1px solid rgba(195, 159, 118, 0.2);
+  border-radius: 24px;
+  background: rgba(31, 25, 20, 0.9);
+  color: var(--latte);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(20px);
+}
+
+.m-qr-login-loading svg {
+  animation: pc-breathe 1.2s ease-in-out infinite;
+}
+
+.m-qr-login-loading strong {
+  font-size: 16px;
+}
+
+.m-qr-login-loading span {
+  color: rgba(245, 239, 230, 0.4);
+  font-size: 12px;
+}
+
+@media (max-height: 760px) {
+  .pc-overview-inner {
+    gap: 7px;
+    padding-top: 8px;
+    padding-bottom: 10px;
+  }
+
+  .pc-brand-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .pc-overview-header h1 {
+    font-size: 20px;
+  }
+
+  .pc-overview-header .pc-brand p,
+  .pc-overview-header > div:last-child > span:last-child {
+    display: none;
+  }
+
+  .pc-status-card {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .pc-status-card > div:first-child > div:first-child {
+    width: 36px;
+    height: 36px;
+  }
+
+  .pc-status-card .text-3xl {
+    font-size: 22px;
+  }
+
+  .pc-log-card {
+    padding: 8px;
+  }
+
+  .pc-connection-card {
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .pc-connection-qr {
+    width: 58px;
+    height: 58px;
+  }
+
+  .pc-overview-page .coffee-calendar {
+    padding: 8px 10px;
+  }
+
+  .pc-overview-page .coffee-calendar-kicker,
+  .pc-overview-page .coffee-calendar-note {
+    display: none;
+  }
+
+  .pc-overview-page .coffee-calendar-nav button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pc-catalog-inner {
+    padding-top: 14px;
+  }
+
+  .pc-catalog-page .cat-card-inner {
+    padding: 18px;
+  }
+}
+
+@media (max-height: 610px) {
+  .pc-overview-panels .pc-status-card > div:nth-child(2),
+  .pc-overview-panels .pc-log-card > div:last-child {
+    display: none;
+  }
+
+  .pc-overview-page .coffee-calendar-header h2 {
+    font-size: 15px;
+  }
+
+  .pc-overview-page .coffee-calendar-weekdays {
+    margin-top: 3px;
+  }
+
+  .pc-overview-page .coffee-calendar-grid {
+    gap: 3px;
+    margin-top: 3px;
   }
 }
 

@@ -116,6 +116,25 @@ export async function updateSupabaseRecordSticker(
   return data ? mapRecordRow(data as CoffeeRecordRow) : null;
 }
 
+export async function updateSupabaseRecordToxicQuote(
+  userId: string,
+  id: string,
+  toxicQuote: string
+) {
+  const supabase = requireSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("coffee_records")
+    .update({ toxic_quote: toxicQuote })
+    .eq("user_id", userId)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return data ? mapRecordRow(data as CoffeeRecordRow) : null;
+}
+
 export async function deleteSupabaseRecord(userId: string, id?: string | null) {
   const supabase = requireSupabaseAdmin();
 

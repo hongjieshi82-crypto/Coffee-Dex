@@ -5,6 +5,7 @@ import { decodeSourceImageDataUrl, MAX_SOURCE_IMAGE_DATA_URL_LENGTH } from "@/im
 import { readJsonWithLimit } from "@/server-json";
 
 export const runtime = "nodejs";
+export const maxDuration = 40;
 
 const maxRecognitionRequestBytes = MAX_SOURCE_IMAGE_DATA_URL_LENGTH + 8 * 1024;
 
@@ -17,7 +18,34 @@ interface RecognitionResult {
   reason: string;
   provider: "openai" | "manual";
   allowManualConfirm: boolean;
+  failureCode?: RecognitionFailureCode;
 }
+
+type RecognitionFailureCode =
+  | "not_configured"
+  | "provider_timeout"
+  | "provider_rate_limited"
+  | "provider_unavailable"
+  | "provider_rejected"
+  | "provider_invalid_response"
+  | "provider_network_error";
+
+class RecognitionProviderError extends Error {
+  constructor(
+    message: string,
+    readonly code: RecognitionFailureCode,
+    readonly retryable: boolean
+  ) {
+    super(message);
+    this.name = "RecognitionProviderError";
+  }
+}
+
+const recognitionAttemptTimeoutMs = getBoundedTimeout(
+  process.env.OPENAI_RECOGNITION_TIMEOUT_MS,
+  12_000
+);
+const recognitionMaxAttempts = 2;
 
 const recognitionPrompt = `你是 Coffee-Dex 的图片饮品检测器。
 只判断图片里是否有真实可饮用饮品或杯具，例如咖啡杯、纸杯、马克杯、玻璃杯、瓶装饮料、奶茶杯、茶杯。
@@ -63,23 +91,62 @@ export async function POST(request: NextRequest) {
   const imageData = sourceImage.dataUrl;
 
   if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({
-      isDrink: true,
-      confidence: 0,
-      vessel: null,
-      drinkType: null,
-      drinkName: null,
-      reason: "AI 识别服务未连接，当前可人工确认后继续录入。",
-      provider: "manual",
-      allowManualConfirm: true,
-    } satisfies RecognitionResult);
+    return NextResponse.json(createManualResult(
+      "AI 识别服务未连接，当前可人工确认后继续录入。",
+      "not_configured"
+    ));
   }
 
+  let failure = new RecognitionProviderError(
+    "AI 识别服务暂时不可用。",
+    "provider_unavailable",
+    true
+  );
+
+  for (let attempt = 1; attempt <= recognitionMaxAttempts; attempt += 1) {
+    try {
+      const parsed = await requestRecognition(imageData);
+      const drinkName = toChineseRecognitionText(parsed.drinkName, null);
+      const drinkType = toChineseRecognitionText(parsed.drinkType, null);
+
+      return NextResponse.json({
+        isDrink: Boolean(parsed.isDrink),
+        confidence: clampConfidence(parsed.confidence),
+        vessel: toChineseRecognitionText(parsed.vessel, null),
+        drinkType,
+        drinkName,
+        reason: toChineseRecognitionText(parsed.reason, "AI 已完成识别。") ?? "AI 已完成识别。",
+        provider: "openai",
+        allowManualConfirm: true,
+      } satisfies RecognitionResult);
+    } catch (error) {
+      failure = normalizeProviderError(error);
+      console.warn(
+        `[Coffee-Dex] Recognition attempt ${attempt}/${recognitionMaxAttempts} failed:`,
+        failure.code,
+        failure.message
+      );
+
+      if (!failure.retryable || attempt === recognitionMaxAttempts) break;
+
+      await delay(350 * attempt);
+    }
+  }
+
+  return NextResponse.json(createManualResult(
+    getFailureReason(failure.code),
+    failure.code
+  ));
+}
+
+async function requestRecognition(imageData: string) {
+  const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), recognitionAttemptTimeoutMs);
+  let result: Response;
+
   try {
-    const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6_000);
-    const result = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    result = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -107,69 +174,126 @@ export async function POST(request: NextRequest) {
       }),
       signal: controller.signal,
     });
-    clearTimeout(timeout);
-
-    if (!result.ok) {
-      const errorText = await result.text();
-      console.warn("[Coffee-Dex] OpenAI recognition failed:", errorText);
-
-      return NextResponse.json({
-        isDrink: true,
-        confidence: 0,
-        vessel: null,
-        drinkType: null,
-        drinkName: null,
-        reason: "AI 识别暂时不可用，已切换为人工确认。",
-        provider: "manual",
-        allowManualConfirm: true,
-      } satisfies RecognitionResult);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new RecognitionProviderError(
+        `视觉模型在 ${recognitionAttemptTimeoutMs}ms 内没有返回。`,
+        "provider_timeout",
+        true
+      );
     }
 
-    const data = await result.json();
-    const content = data.choices?.[0]?.message?.content ?? "{}";
-    const parsed = parseRecognitionJson(content);
-    const drinkName = toChineseRecognitionText(parsed.drinkName, null);
-    const drinkType = toChineseRecognitionText(parsed.drinkType, null);
+    throw new RecognitionProviderError(
+      error instanceof Error ? error.message : "无法连接视觉模型。",
+      "provider_network_error",
+      true
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 
-    return NextResponse.json({
-      isDrink: Boolean(parsed.isDrink),
-      confidence: clampConfidence(parsed.confidence),
-      vessel: toChineseRecognitionText(parsed.vessel, null),
-      drinkType,
-      drinkName,
-      reason: toChineseRecognitionText(parsed.reason, "AI 已完成识别。") ?? "AI 已完成识别。",
-      provider: "openai",
-      allowManualConfirm: true,
-    } satisfies RecognitionResult);
+  if (!result.ok) {
+    const errorText = (await result.text()).slice(0, 500);
+    const retryable = result.status === 408 || result.status === 429 || result.status >= 500;
+    const code: RecognitionFailureCode = result.status === 429
+      ? "provider_rate_limited"
+      : result.status >= 500 || result.status === 408
+        ? "provider_unavailable"
+        : "provider_rejected";
+
+    throw new RecognitionProviderError(
+      `视觉模型返回 ${result.status}${errorText ? `：${errorText}` : ""}`,
+      code,
+      retryable
+    );
+  }
+
+  try {
+    const data = await result.json() as {
+      choices?: Array<{ message?: { content?: unknown } }>;
+    };
+    const content = data.choices?.[0]?.message?.content;
+
+    if (typeof content !== "string" || !content.trim()) {
+      throw new Error("视觉模型没有返回识别内容。");
+    }
+
+    return parseRecognitionJson(content);
   } catch (error) {
-    console.warn("[Coffee-Dex] Recognition exception:", error);
-
-    return NextResponse.json({
-      isDrink: true,
-      confidence: 0,
-      vessel: null,
-      drinkType: null,
-      drinkName: null,
-      reason: "AI 识别请求失败，已切换为人工确认。",
-      provider: "manual",
-      allowManualConfirm: true,
-    } satisfies RecognitionResult);
+    throw new RecognitionProviderError(
+      error instanceof Error ? error.message : "视觉模型返回格式不正确。",
+      "provider_invalid_response",
+      true
+    );
   }
 }
 
-function parseRecognitionJson(content: string) {
+function createManualResult(reason: string, failureCode: RecognitionFailureCode): RecognitionResult {
+  return {
+    isDrink: true,
+    confidence: 0,
+    vessel: null,
+    drinkType: null,
+    drinkName: null,
+    reason,
+    provider: "manual",
+    allowManualConfirm: true,
+    failureCode,
+  };
+}
+
+function normalizeProviderError(error: unknown) {
+  if (error instanceof RecognitionProviderError) return error;
+
+  return new RecognitionProviderError(
+    error instanceof Error ? error.message : "AI 识别发生未知错误。",
+    "provider_unavailable",
+    true
+  );
+}
+
+function getFailureReason(code: RecognitionFailureCode) {
+  if (code === "provider_timeout") return "视觉模型响应超时，已自动重试，仍未完成识别。你可以再次识别或人工确认。";
+  if (code === "provider_rate_limited") return "AI 服务当前请求较多，已自动重试。你可以稍后再次识别或人工确认。";
+  if (code === "provider_network_error") return "服务器暂时无法连接 AI 服务，已自动重试。你可以检查网络后再次识别。";
+  if (code === "provider_rejected") return "AI 服务配置或请求参数异常，请检查模型配置后重试。";
+  if (code === "provider_invalid_response") return "AI 返回内容格式异常，已自动重试。你可以再次识别或人工确认。";
+  return "AI 识别服务暂时不可用，已自动重试。你可以稍后再次识别或人工确认。";
+}
+
+function getBoundedTimeout(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return fallback;
+
+  return Math.max(5_000, Math.min(15_000, Math.round(parsed)));
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRecognitionJson(content: string): Record<string, unknown> {
   try {
-    return JSON.parse(content);
+    const parsed = JSON.parse(content) as unknown;
+
+    return isRecord(parsed) ? parsed : {};
   } catch {
     const start = content.indexOf("{");
     const end = content.lastIndexOf("}");
 
     if (start >= 0 && end > start) {
-      return JSON.parse(content.slice(start, end + 1));
+      const parsed = JSON.parse(content.slice(start, end + 1)) as unknown;
+
+      return isRecord(parsed) ? parsed : {};
     }
 
     return {};
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function clampConfidence(value: unknown) {

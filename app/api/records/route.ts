@@ -6,13 +6,21 @@ import {
   coffeeTypeMap,
   getCaffeine,
   getRandomToxicQuote,
+  toxicQuotes,
 } from "@/coffee-data";
-import { addRecord, deleteRecord, getRecordState, updateRecordSticker } from "@/record-store";
+import {
+  addRecord,
+  deleteRecord,
+  getRecordState,
+  updateRecordSticker,
+  updateRecordToxicQuote,
+} from "@/record-store";
 import {
   addSupabaseRecord,
   deleteSupabaseRecord,
   getSupabaseRecords,
   updateSupabaseRecordSticker,
+  updateSupabaseRecordToxicQuote,
 } from "@/supabase-record-store";
 import { getRequestUser, isSupabaseAuthConfigured } from "@/supabase-server";
 import { getLocalRequestUser } from "@/local-auth";
@@ -171,7 +179,7 @@ export async function PATCH(request: NextRequest) {
   const user = supabaseAuthEnabled ? await getRequestUser(request) : await getLocalRequestUser(request);
 
   if (!user) {
-    return NextResponse.json({ error: "请先登录后更新贴纸。" }, { status: 401 });
+    return NextResponse.json({ error: "请先登录后更新记录。" }, { status: 401 });
   }
 
   const bodyResult = await readJsonWithLimit(request, maxStickerPatchBytes);
@@ -189,12 +197,47 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "请求内容不合法。" }, { status: 400 });
   }
 
-  const { id, stickerData, stickerVersion } = body as {
+  const { id, stickerData, stickerVersion, toxicQuote } = body as {
     id?: unknown;
     stickerData?: unknown;
     stickerVersion?: unknown;
+    toxicQuote?: unknown;
   };
   const fields = Object.keys(body);
+
+  if (typeof id !== "string" || !recordIdPattern.test(id)) {
+    return NextResponse.json({ error: "记录 ID 不合法。" }, { status: 400 });
+  }
+
+  if (fields.length === 2 && fields.includes("id") && fields.includes("toxicQuote")) {
+    if (typeof toxicQuote !== "string" || !toxicQuotes.includes(toxicQuote as (typeof toxicQuotes)[number])) {
+      return NextResponse.json({ error: "毒鸡汤文案不在可用列表中。" }, { status: 400 });
+    }
+
+    if (supabaseAuthEnabled) {
+      try {
+        const record = await updateSupabaseRecordToxicQuote(user.id, id, toxicQuote);
+
+        if (!record) {
+          return NextResponse.json({ error: "没有找到这条记录。" }, { status: 404 });
+        }
+
+        return NextResponse.json({ record, updatedAt: Date.now() });
+      } catch (error) {
+        console.warn("[Coffee-Dex] Supabase toxic quote PATCH failed:", error);
+
+        return NextResponse.json({ error: "线上毒鸡汤更新失败，请稍后重试。" }, { status: 500 });
+      }
+    }
+
+    const result = await updateRecordToxicQuote(id, toxicQuote, user.id);
+
+    if (!result) {
+      return NextResponse.json({ error: "没有找到这条记录。" }, { status: 404 });
+    }
+
+    return NextResponse.json(result);
+  }
 
   if (
     fields.length !== 3 ||
@@ -203,10 +246,6 @@ export async function PATCH(request: NextRequest) {
     !fields.includes("stickerVersion")
   ) {
     return NextResponse.json({ error: "请求内容只能包含记录 ID、贴纸和贴纸版本。" }, { status: 400 });
-  }
-
-  if (typeof id !== "string" || !recordIdPattern.test(id)) {
-    return NextResponse.json({ error: "记录 ID 不合法。" }, { status: 400 });
   }
 
   if (stickerVersion !== CURRENT_STICKER_VERSION) {

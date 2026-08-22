@@ -38,10 +38,18 @@ interface PendingEmailCodeRecord {
   sentAt: number;
 }
 
+interface PendingQrLoginRecord {
+  userId: string;
+  tokenHash: string;
+  expiresAt: number;
+  createdAt: number;
+}
+
 interface LocalUserState {
   users: LocalUserRecord[];
   pendingSignups?: PendingSignupRecord[];
   pendingEmailCodes?: PendingEmailCodeRecord[];
+  pendingQrLogins?: PendingQrLoginRecord[];
   updatedAt: number;
 }
 
@@ -49,6 +57,7 @@ const usersPath = path.join(process.cwd(), "data", "local-users.json");
 const tokenTtlMs = 30 * 24 * 60 * 60 * 1000;
 const signupCodeTtlMs = 10 * 60 * 1000;
 const resendCooldownMs = 60 * 1000;
+const qrLoginTtlMs = 3 * 60 * 1000;
 let cache: LocalUserState | null = null;
 
 export async function startLocalSignUp(email: string, password: string) {
@@ -261,6 +270,75 @@ export async function getLocalRequestUser(request: NextRequest) {
   return existing ? tokenUser : null;
 }
 
+export async function createLocalQrLogin(userId: string) {
+  const state = await readUserState();
+  const user = state.users.find((item) => item.id === userId);
+
+  if (!user) {
+    throw new Error("当前登录账号不存在，请重新登录。");
+  }
+
+  const token = crypto.randomBytes(32).toString("base64url");
+  const now = Date.now();
+  const expiresAt = now + qrLoginTtlMs;
+
+  await writeUserState({
+    ...state,
+    pendingQrLogins: [
+      {
+        userId,
+        tokenHash: hashQrLoginToken(token),
+        expiresAt,
+        createdAt: now,
+      },
+      ...(state.pendingQrLogins ?? []).filter(
+        (item) => item.userId !== userId && item.expiresAt > now
+      ),
+    ].slice(0, 40),
+    updatedAt: now,
+  });
+
+  return {
+    ticket: `l.${token}`,
+    expiresAt,
+  };
+}
+
+export async function redeemLocalQrLogin(ticket: string) {
+  const token = ticket.startsWith("l.") ? ticket.slice(2) : "";
+
+  if (!token) {
+    throw new Error("扫码登录凭证无效，请刷新电脑端二维码后重试。");
+  }
+
+  const state = await readUserState();
+  const now = Date.now();
+  const tokenHash = hashQrLoginToken(token);
+  const pending = (state.pendingQrLogins ?? []).find(
+    (item) => item.tokenHash === tokenHash && item.expiresAt > now
+  );
+
+  if (!pending) {
+    throw new Error("二维码已使用或已过期，请刷新电脑端二维码后重试。");
+  }
+
+  const user = state.users.find((item) => item.id === pending.userId);
+
+  await writeUserState({
+    ...state,
+    pendingQrLogins: (state.pendingQrLogins ?? []).filter(
+      (item) => item.tokenHash !== tokenHash && item.expiresAt > now
+    ),
+    updatedAt: now,
+  });
+
+  if (!user) {
+    throw new Error("扫码授权账号不存在，请在电脑端重新登录。");
+  }
+
+  return createLocalSession(user);
+}
+
 export function verifyLocalToken(token: string): LocalAuthUser | null {
   const [payloadPart, signature] = token.split(".");
 
@@ -329,6 +407,9 @@ async function readUserState(): Promise<LocalUserState> {
       pendingEmailCodes: Array.isArray(parsed.pendingEmailCodes)
         ? parsed.pendingEmailCodes.filter((item) => item.expiresAt > Date.now())
         : [],
+      pendingQrLogins: Array.isArray(parsed.pendingQrLogins)
+        ? parsed.pendingQrLogins.filter((item) => item.expiresAt > Date.now())
+        : [],
       updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now(),
     };
   } catch {
@@ -336,6 +417,7 @@ async function readUserState(): Promise<LocalUserState> {
       users: [],
       pendingSignups: [],
       pendingEmailCodes: [],
+      pendingQrLogins: [],
       updatedAt: Date.now(),
     };
   }
@@ -344,9 +426,15 @@ async function readUserState(): Promise<LocalUserState> {
 }
 
 async function writeUserState(state: LocalUserState) {
-  cache = state;
+  const nextState: LocalUserState = {
+    ...state,
+    pendingSignups: state.pendingSignups ?? cache?.pendingSignups ?? [],
+    pendingEmailCodes: state.pendingEmailCodes ?? cache?.pendingEmailCodes ?? [],
+    pendingQrLogins: state.pendingQrLogins ?? cache?.pendingQrLogins ?? [],
+  };
+  cache = nextState;
   await fs.mkdir(path.dirname(usersPath), { recursive: true });
-  await fs.writeFile(usersPath, JSON.stringify(state, null, 2), "utf8");
+  await fs.writeFile(usersPath, JSON.stringify(nextState, null, 2), "utf8");
 }
 
 function normalizeEmail(email: string) {
@@ -472,6 +560,10 @@ async function sendSignupCode(email: string, code: string) {
 
 function hashPassword(password: string, salt: string) {
   return crypto.pbkdf2Sync(password, salt, 120_000, 32, "sha256").toString("hex");
+}
+
+function hashQrLoginToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 function sign(payloadPart: string) {

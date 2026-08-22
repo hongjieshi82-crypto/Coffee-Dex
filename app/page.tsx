@@ -38,6 +38,12 @@ interface NetworkResponse {
   lanIps: string[];
 }
 
+interface QrLoginResponse {
+  ticket?: string;
+  expiresAt?: number;
+  error?: string;
+}
+
 const timeFilterLabels: Record<string, string> = {
   all: "全部",
   week: "本周",
@@ -63,6 +69,7 @@ export default function Home() {
   const [selectedSubtype, setSelectedSubtype] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all");
   const [shareUrl, setShareUrl] = useState("");
+  const [qrLoginUrl, setQrLoginUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(0);
@@ -142,6 +149,57 @@ export default function Home() {
     setReportRecord((current) => current?.id === updatedRecord.id ? updatedRecord : current);
   }, []);
 
+  useEffect(() => {
+    if (!shareUrl) return;
+
+    const mobileUrl = new URL("/mobile", shareUrl).toString();
+
+    if (!isAuthEnabled) {
+      const localTimer = window.setTimeout(() => setQrLoginUrl(mobileUrl), 0);
+      return () => window.clearTimeout(localTimer);
+    }
+
+    if (authLoading || !authUser) {
+      const clearTimer = window.setTimeout(() => setQrLoginUrl(""), 0);
+      return () => window.clearTimeout(clearTimer);
+    }
+
+    let active = true;
+
+    const createQrLogin = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch("/api/auth/qr", {
+          method: "POST",
+          headers,
+          cache: "no-store",
+        });
+        const data = (await response.json()) as QrLoginResponse;
+
+        if (!active) return;
+
+        if (!response.ok || !data.ticket) {
+          setQrLoginUrl("");
+          return;
+        }
+
+        const nextUrl = new URL(mobileUrl);
+        nextUrl.searchParams.set("login", data.ticket);
+        setQrLoginUrl(nextUrl.toString());
+      } catch {
+        if (active) setQrLoginUrl("");
+      }
+    };
+
+    void createQrLogin();
+    const interval = window.setInterval(createQrLogin, 2 * 60 * 1000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [authLoading, authUser, getAuthHeaders, isAuthEnabled, shareUrl]);
+
   useStickerBackfill({
     records,
     activeOwner: activeRecordsOwner,
@@ -210,12 +268,13 @@ export default function Home() {
   useEffect(() => {
     let active = true;
 
-    if (!shareUrl) {
-      return;
+    if (!qrLoginUrl) {
+      const clearTimer = window.setTimeout(() => setQrDataUrl(""), 0);
+      return () => window.clearTimeout(clearTimer);
     }
 
-    QRCode.toDataURL(shareUrl, {
-      width: 180,
+    QRCode.toDataURL(qrLoginUrl, {
+      width: 156,
       margin: 2,
       errorCorrectionLevel: "M",
       color: {
@@ -233,7 +292,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [shareUrl]);
+  }, [qrLoginUrl]);
 
   const selectedCategory = useMemo(
     () => coffeeCategories.find((category) => category.id === selectedCategoryId) ?? null,
@@ -288,9 +347,9 @@ export default function Home() {
   }, [authUser?.id, isAuthEnabled]);
 
   const copyShareUrl = async () => {
-    if (!shareUrl) return;
+    if (!qrLoginUrl) return;
 
-    await navigator.clipboard.writeText(shareUrl);
+    await navigator.clipboard.writeText(qrLoginUrl);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
   };
@@ -342,15 +401,17 @@ export default function Home() {
   }
 
   return (
-    <main className="pc-view min-h-screen">
+    <main className="pc-view pc-snap-shell">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 h-96 w-96 rounded-full bg-[radial-gradient(circle,rgba(195,159,118,0.03),transparent_70%)]" />
         <div className="absolute bottom-0 right-1/4 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(195,159,118,0.02),transparent_70%)]" />
         <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(195,159,118,0.01),transparent_70%)]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl space-y-6 px-6 py-6">
-        <header className="flex items-center justify-between pc-fade-down">
+      <div className="pc-snap-pages relative z-10">
+        <section className="pc-snap-page pc-overview-page">
+          <div className="pc-page-inner pc-overview-inner">
+        <header className="pc-overview-header flex items-center justify-between pc-fade-down">
           <div className="pc-brand">
             <BrandLogo className="pc-brand-logo" sizes="48px" preload />
             <div>
@@ -383,11 +444,12 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="flex flex-wrap items-stretch gap-4">
+        <section className="pc-overview-panels flex flex-wrap items-stretch gap-3">
           <StatusPanel totalCaffeine={totalCaffeine} weekCups={weekCups} monthCups={monthCups} hasRecords={records.length > 0} />
           <LogCard records={records} onOpen={() => setHistoryOpen(true)} now={now} />
           <ConnectionPanel
             shareUrl={shareUrl}
+            qrLoginUrl={qrLoginUrl}
             qrSrc={qrSrc}
             copied={copied}
             onCopy={copyShareUrl}
@@ -396,7 +458,21 @@ export default function Home() {
 
         <CoffeeCalendar records={records} onOpenDay={openDay} />
 
-        <section ref={recordBrowserRef} className="w-full scroll-mt-6">
+        <button
+          type="button"
+          className="pc-page-cue"
+          onClick={() => recordBrowserRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          aria-label="滑到咖啡图鉴"
+        >
+          <span>向下滑动查看图鉴</span>
+          <span className="pc-page-cue-arrow">⌄</span>
+        </button>
+          </div>
+        </section>
+
+        <section ref={recordBrowserRef} className="pc-snap-page pc-catalog-page">
+          <div className="pc-page-inner pc-catalog-inner">
+        <section className="w-full">
           <div className="mb-6 flex items-center gap-3">
             <h2 className="text-lg font-bold text-latte">
               {selectedDayKey
@@ -458,6 +534,8 @@ export default function Home() {
             开源许可
           </a>
         </footer>
+          </div>
+        </section>
       </div>
 
       {detailRecord && (
@@ -506,7 +584,7 @@ function StatusPanel({
   hasRecords: boolean;
 }) {
   return (
-    <section className="glass-card flex min-w-[300px] flex-1 items-center justify-between rounded-2xl px-8 py-4">
+    <section className="glass-card pc-status-card flex min-w-[300px] flex-1 items-center justify-between rounded-2xl px-6 py-3">
       <div className="flex items-center gap-4">
         <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-latte/20 bg-latte/10">
           <Coffee className="h-5 w-5 text-latte animate-breathe" />
@@ -547,10 +625,10 @@ function LogCard({ records, now, onOpen }: { records: CoffeeRecord[]; now: numbe
       type="button"
       id="logCard"
       onClick={onOpen}
-      className="glass-card flex min-w-[160px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl p-5 transition"
+      className="glass-card pc-log-card flex min-w-[148px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl p-3 transition"
     >
       <div className="w-full text-center text-xs uppercase tracking-wider text-latte/60">咖啡日志</div>
-      <BookOpen className="h-8 w-8 text-latte/75" />
+      <BookOpen className="h-7 w-7 text-latte/75" />
       <div className="text-center text-xs text-white/40">{records.length ? `本月 ${monthCups} 杯` : "暂无记录"}</div>
     </button>
   );
@@ -558,11 +636,13 @@ function LogCard({ records, now, onOpen }: { records: CoffeeRecord[]; now: numbe
 
 function ConnectionPanel({
   shareUrl,
+  qrLoginUrl,
   qrSrc,
   copied,
   onCopy,
 }: {
   shareUrl: string;
+  qrLoginUrl: string;
   qrSrc: string;
   copied: boolean;
   onCopy: () => void;
@@ -572,11 +652,11 @@ function ConnectionPanel({
     !/^https?:\/\/(localhost|127\.0\.0\.1|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(shareUrl);
 
   return (
-    <section className="glass-card flex min-w-[200px] flex-col items-center gap-4 rounded-2xl p-5">
+    <section className="glass-card pc-connection-card flex min-w-[176px] flex-col items-center gap-2.5 rounded-2xl p-3.5">
       <div className="w-full text-center text-xs uppercase tracking-wider text-latte/60">连接舱</div>
-      <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white p-2">
-        {qrSrc && shareUrl ? (
-          <a href={shareUrl} target="_blank" rel="noreferrer" className="block h-full w-full">
+      <div className="pc-connection-qr relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white p-1.5">
+        {qrSrc && qrLoginUrl ? (
+          <a href={qrLoginUrl} target="_blank" rel="noreferrer" className="block h-full w-full">
             <img src={qrSrc} alt="共享入口二维码" className="h-full w-full" />
           </a>
         ) : (
@@ -588,17 +668,18 @@ function ConnectionPanel({
           <div className="h-3 w-3 rounded-full bg-neon-green" />
           <div className="absolute inset-0 h-3 w-3 rounded-full bg-neon-green animate-pulse-dot" />
         </div>
-        <span className="text-xs text-neon-green">共享入口已就绪</span>
+        <span className="text-[11px] text-neon-green">{qrLoginUrl ? "扫码免登录 · 3 分钟有效" : "正在生成扫码授权..."}</span>
       </div>
       <button
         type="button"
         onClick={onCopy}
-        className="flex max-w-[210px] items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] text-white/35 transition hover:text-latte"
+        disabled={!qrLoginUrl}
+        className="pc-connection-copy flex max-w-[190px] items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] text-white/35 transition hover:text-latte disabled:cursor-wait disabled:opacity-50"
       >
         <Clipboard className="h-3 w-3 shrink-0" />
-        <span className="truncate">{copied ? "已复制" : shareUrl || "正在生成共享地址..."}</span>
+        <span className="truncate">{copied ? "已复制手机入口" : shareUrl || "正在生成共享地址..."}</span>
       </button>
-      <div className="flex items-center gap-1 text-[10px] text-white/20">
+      <div className="pc-connection-device flex items-center gap-1 text-[10px] text-white/20">
         <Smartphone className="h-3 w-3" />
         {isPublicUrl ? "电脑/手机自动适配" : "同一 Wi-Fi 下自动适配"}
       </div>

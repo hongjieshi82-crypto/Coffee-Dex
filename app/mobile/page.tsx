@@ -3,13 +3,14 @@
 /* eslint-disable @next/next/no-img-element */
 import { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, CheckCircle2, ChevronLeft, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Camera, CheckCircle2, ChevronLeft, QrCode, RefreshCw, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import {
   CoffeeRecord,
   CURRENT_STICKER_VERSION,
   coffeeCategories,
   coffeeTypeMap,
   getExactCoffeeMatch,
+  getNextToxicQuote,
   searchCoffeeTypes,
 } from "@/coffee-data";
 import { AuthGate } from "@/app/AuthGate";
@@ -31,6 +32,7 @@ const quickVolumes = [
   { label: "超大杯", ml: 480 },
 ];
 const NEW_RECORD_STICKER_DELAY_MS = 500;
+const RECOGNITION_CLIENT_TIMEOUT_MS = 36_000;
 
 type TimeFilter = "all" | "week" | "month" | "year";
 
@@ -50,6 +52,7 @@ interface RecognitionResult {
   reason: string;
   provider: "openai" | "manual";
   allowManualConfirm: boolean;
+  failureCode?: string;
 }
 
 interface RecordsResponse {
@@ -65,6 +68,7 @@ export default function MobilePage() {
     loading: authLoading,
     user: authUser,
     getAuthHeaders,
+    redeemQrLogin,
     signOut,
   } = auth;
   const activeRecordsOwner = authUser?.id ?? (isAuthEnabled ? null : "local");
@@ -83,14 +87,17 @@ export default function MobilePage() {
   const [message, setMessage] = useState("");
   const [lastRecord, setLastRecord] = useState<CoffeeRecord | null>(null);
   const [showResultCard, setShowResultCard] = useState(false);
+  const [quoteRefreshing, setQuoteRefreshing] = useState(false);
   const [screen, setScreen] = useState<"entry" | "home">("entry");
   const [records, setRecords] = useState<CoffeeRecord[]>([]);
   const [loadedRecordsOwner, setLoadedRecordsOwner] = useState<string | null>(null);
   const [surfaceChecked, setSurfaceChecked] = useState(false);
+  const [qrLoginPending, setQrLoginPending] = useState(true);
   const photoRequestRef = useRef(0);
   const recognitionRequestRef = useRef(0);
   const recognitionAbortRef = useRef<AbortController | null>(null);
   const refreshRequestRef = useRef(0);
+  const qrLoginAttemptedRef = useRef(false);
 
   const refreshRecords = useCallback(async () => {
     const requestId = ++refreshRequestRef.current;
@@ -169,6 +176,34 @@ export default function MobilePage() {
 
     return () => window.clearTimeout(checkTimer);
   }, [router]);
+
+  useEffect(() => {
+    if (!surfaceChecked || authLoading || qrLoginAttemptedRef.current) return;
+
+    const ticket = new URLSearchParams(window.location.search).get("login");
+    qrLoginAttemptedRef.current = true;
+
+    if (!ticket || authUser) {
+      if (ticket) window.history.replaceState(null, "", window.location.pathname);
+      const readyTimer = window.setTimeout(() => setQrLoginPending(false), 0);
+      return () => window.clearTimeout(readyTimer);
+    }
+
+    void redeemQrLogin(ticket).then((success) => {
+      if (success) window.history.replaceState(null, "", window.location.pathname);
+      setQrLoginPending(false);
+    });
+  }, [authLoading, authUser, redeemQrLogin, surfaceChecked]);
+
+  useEffect(() => {
+    if (!message || message.endsWith("...")) return;
+
+    const dismissTimer = window.setTimeout(() => {
+      setMessage((current) => current === message ? "" : current);
+    }, 2800);
+
+    return () => window.clearTimeout(dismissTimer);
+  }, [message]);
 
   useEffect(() => {
     if (!surfaceChecked) return;
@@ -318,7 +353,11 @@ export default function MobilePage() {
     setRecognizing(true);
     setMessage("");
 
-    const timeout = window.setTimeout(() => controller.abort(), 6_500);
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, RECOGNITION_CLIENT_TIMEOUT_MS);
 
     try {
       const authHeaders = await getAuthHeaders();
@@ -363,7 +402,11 @@ export default function MobilePage() {
     } catch {
       if (requestId !== recognitionRequestRef.current) return;
 
-      setRecognition(createManualRecognition("AI 识别请求失败，请人工确认这张照片是否为饮品。"));
+      setRecognition(createManualRecognition(
+        timedOut
+          ? "AI 识别等待超时。你可以重新识别，或人工确认这张照片是饮品。"
+          : "手机与识别服务的网络连接中断。请检查网络后重新识别，或人工确认。"
+      ));
       setManualConfirmed(false);
       setMessage("");
     } finally {
@@ -413,6 +456,55 @@ export default function MobilePage() {
       console.warn("[Coffee-Dex] Background sticker update failed:", error);
     }
   }, [getAuthHeaders]);
+
+  const refreshToxicQuote = async () => {
+    if (!lastRecord || quoteRefreshing) return;
+
+    const recordId = lastRecord.id;
+    const previousQuote = lastRecord.toxicQuote;
+    const nextQuote = getNextToxicQuote(previousQuote);
+    const applyQuote = (quote: string) => {
+      setLastRecord((current) => current?.id === recordId ? { ...current, toxicQuote: quote } : current);
+      setRecords((current) => current.map((record) => (
+        record.id === recordId ? { ...record, toxicQuote: quote } : record
+      )));
+    };
+
+    setQuoteRefreshing(true);
+    applyQuote(nextQuote);
+
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch("/api/records", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ id: recordId, toxicQuote: nextQuote }),
+      });
+      const data = await response.json().catch(() => ({ error: "毒鸡汤更新失败，请重试。" })) as {
+        error?: string;
+      };
+
+      if (response.status === 401) {
+        applyQuote(previousQuote);
+        setMessage(data.error ?? "登录状态已失效，请重新登录。");
+        void signOut();
+        return;
+      }
+
+      if (!response.ok) {
+        applyQuote(previousQuote);
+        setMessage(data.error ?? "毒鸡汤更新失败，请重试。");
+        return;
+      }
+
+      setMessage("已换一条职场冷幽默。");
+    } catch {
+      applyQuote(previousQuote);
+      setMessage("网络异常，毒鸡汤更新失败。");
+    } finally {
+      setQuoteRefreshing(false);
+    }
+  };
 
   const submit = async () => {
     if (!canSubmit || !selectedCoffee || !imageData) return;
@@ -474,10 +566,17 @@ export default function MobilePage() {
     void refreshRecords();
   };
 
-  if (!surfaceChecked) {
+  if (!surfaceChecked || qrLoginPending) {
     return (
       <main className="mobile-view">
         <div className="m-ambient" />
+        {surfaceChecked && (
+          <div className="m-qr-login-loading" role="status" aria-live="polite">
+            <QrCode size={30} />
+            <strong>正在接入你的咖啡图鉴</strong>
+            <span>扫码授权校验中...</span>
+          </div>
+        )}
       </main>
     );
   }
@@ -550,7 +649,7 @@ export default function MobilePage() {
             <div className={`m-ai-overlay ${recognizing ? "active" : ""}`}>
               <div className="m-ai-spinner" />
               <div className="m-ai-text">AI 识别中...</div>
-              <div className="m-ai-sub">正在确认是否为咖啡饮品</div>
+              <div className="m-ai-sub">正在确认是否为饮品，网络较慢时会自动重试</div>
             </div>
           </label>
           <input id="mFileInput" type="file" accept="image/*" onChange={handlePhoto} />
@@ -564,16 +663,25 @@ export default function MobilePage() {
               {recognition.confidence > 0 ? `（置信度 ${Math.round(recognition.confidence * 100)}%）` : ""}
             </div>
             {!recognitionApproved && recognition.allowManualConfirm && (
-              <button
-                type="button"
-                className="m-ai-confirm-btn"
-                onClick={() => {
-                  setManualConfirmed(true);
-                  setMessage("已确认，继续选择饮品类型。");
-                }}
-              >
-                我确认这是饮品，继续录入
-              </button>
+              <div className="m-ai-status-actions">
+                <button
+                  type="button"
+                  className="m-ai-retry-btn"
+                  onClick={() => imageData && void recognizeImage(imageData)}
+                >
+                  重新识别
+                </button>
+                <button
+                  type="button"
+                  className="m-ai-confirm-btn"
+                  onClick={() => {
+                    setManualConfirmed(true);
+                    setMessage("已确认，继续选择饮品类型。");
+                  }}
+                >
+                  确认是饮品
+                </button>
+              </div>
             )}
           </section>
         )}
@@ -748,6 +856,8 @@ export default function MobilePage() {
       {lastRecord && showResultCard && (
         <ResultCard
           record={lastRecord}
+          refreshingQuote={quoteRefreshing}
+          onRefreshQuote={refreshToxicQuote}
           onClose={() => {
             setShowResultCard(false);
             resetForm();
@@ -1206,10 +1316,14 @@ function MobileDetailPopup({ record, onClose }: { record: CoffeeRecord; onClose:
 
 function ResultCard({
   record,
+  refreshingQuote,
+  onRefreshQuote,
   onClose,
   onOpenHome,
 }: {
   record: CoffeeRecord;
+  refreshingQuote: boolean;
+  onRefreshQuote: () => void;
   onClose: () => void;
   onOpenHome: () => void;
 }) {
@@ -1232,7 +1346,19 @@ function ResultCard({
           <span className="m-toxic-tag">{record.volumeMl}ml</span>
         </div>
         <div className="m-toxic-divider" />
-        <div className="m-toxic-quote">{record.toxicQuote}</div>
+        <div className="m-toxic-quote">
+          <button
+            type="button"
+            className="m-toxic-refresh"
+            onClick={onRefreshQuote}
+            disabled={refreshingQuote}
+            aria-label="换一句毒鸡汤"
+            title="换一句"
+          >
+            <RefreshCw size={13} />
+          </button>
+          <span>{record.toxicQuote}</span>
+        </div>
         <div className="m-toxic-actions">
           <button type="button" className="m-toxic-secondary-btn" onClick={onClose}>
             关闭

@@ -29,6 +29,11 @@ interface LocalAuthResponse {
   error?: string;
 }
 
+interface QrAuthResponse extends LocalAuthResponse {
+  authMode?: AuthMode;
+  refresh_token?: string;
+}
+
 export type SignUpResult = "signed-in" | "verification-sent";
 
 type LocalSignupResult =
@@ -50,6 +55,7 @@ export interface CoffeeAuth {
   verifyLoginCode: (email: string, token: string) => Promise<boolean>;
   startPasswordReset: (email: string) => Promise<boolean>;
   resetPasswordWithCode: (email: string, token: string, password: string) => Promise<boolean>;
+  redeemQrLogin: (ticket: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   clearMessage: () => void;
 }
@@ -453,6 +459,68 @@ export function useCoffeeAuth(): CoffeeAuth {
     }
   }, [authMode, isAuthEnabled]);
 
+  const redeemQrLogin = useCallback(async (ticket: string) => {
+    if (!isAuthEnabled || !ticket) return false;
+
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/auth/qr", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket }),
+      });
+      const data = (await response.json()) as QrAuthResponse;
+
+      if (!response.ok || !data.access_token || !data.user) {
+        setMessage(data.error ?? "扫码登录失败，请刷新电脑端二维码后重试。");
+        return false;
+      }
+
+      if (data.authMode === "supabase") {
+        const supabase = getBrowserSupabase();
+
+        if (!supabase || !data.refresh_token) {
+          setMessage("当前手机端缺少云端登录配置。");
+          return false;
+        }
+
+        const { data: sessionData, error } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
+
+        if (error || !sessionData.session?.user) {
+          setMessage("手机登录状态建立失败，请重新扫码。");
+          return false;
+        }
+
+        setAuthMode("supabase");
+        setSession(sessionData.session);
+        setUser({
+          id: sessionData.session.user.id,
+          email: sessionData.session.user.email,
+        });
+        setMessage("");
+        return true;
+      }
+
+      const localSession: LocalSession = {
+        access_token: data.access_token,
+        user: data.user,
+      };
+      storeLocalToken(localSession.access_token);
+      setAuthMode("local");
+      setSession(localSession);
+      setUser(localSession.user);
+      setMessage("");
+      return true;
+    } catch {
+      setMessage("网络异常，扫码登录失败，请重试。");
+      return false;
+    }
+  }, [isAuthEnabled]);
+
   const signOut = useCallback(async () => {
     if (authMode === "local") {
       removeStoredLocalToken();
@@ -491,6 +559,7 @@ export function useCoffeeAuth(): CoffeeAuth {
     verifyLoginCode,
     startPasswordReset,
     resetPasswordWithCode,
+    redeemQrLogin,
     signOut,
     clearMessage: () => setMessage(""),
   };
