@@ -16,6 +16,7 @@ export interface CoffeeCategory {
 }
 
 export const CURRENT_STICKER_VERSION = 4;
+const MIN_USABLE_STICKER_DATA_URL_LENGTH = 1_000;
 
 export interface CoffeeRecord {
   id: string;
@@ -32,6 +33,18 @@ export interface CoffeeRecord {
   aiComment: string;
   toxicQuote: string;
   timestamp: number;
+}
+
+export function hasUsableStickerData(record: CoffeeRecord) {
+  return Boolean(
+    record.stickerData?.startsWith("data:image/png;base64,") &&
+    record.stickerData.length >= MIN_USABLE_STICKER_DATA_URL_LENGTH
+  );
+}
+
+export function hasUsableCurrentSticker(record: CoffeeRecord) {
+  return hasUsableStickerData(record) &&
+    (record.stickerVersion ?? 0) >= CURRENT_STICKER_VERSION;
 }
 
 const withCategory = (

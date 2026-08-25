@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { CoffeeRecord, CURRENT_STICKER_VERSION } from "@/coffee-data";
-import { getLocalDayKey } from "@/app/CoffeeCalendar";
+import {
+  CoffeeRecord,
+  CURRENT_STICKER_VERSION,
+  hasUsableCurrentSticker,
+} from "@/coffee-data";
 import {
   createSticker,
   isStickerQueueIdle,
@@ -164,21 +167,18 @@ function findLatestStickerCandidate(
   retryStates: Map<string, RetryState>,
   now: number
 ) {
-  const seenDays = new Set<string>();
-
   return records
     .slice()
     .sort((a, b) => b.timestamp - a.timestamp)
     .find((record) => {
-      const dayKey = getLocalDayKey(new Date(record.timestamp));
-      if (seenDays.has(dayKey)) return false;
-      seenDays.add(dayKey);
-
       const retryState = retryStates.get(record.id);
 
       return Boolean(
         record.imageData &&
-        (record.stickerVersion ?? 0) < CURRENT_STICKER_VERSION &&
+        (
+          (record.stickerVersion ?? 0) < CURRENT_STICKER_VERSION ||
+          !hasUsableCurrentSticker(record)
+        ) &&
         (!retryState || retryState.retryAt <= now)
       );
     });

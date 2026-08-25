@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { CoffeeRecord, CURRENT_STICKER_VERSION } from "@/coffee-data";
+import { CoffeeRecord, hasUsableStickerData } from "@/coffee-data";
 
 interface CoffeeCalendarProps {
   records: CoffeeRecord[];
@@ -86,10 +86,10 @@ export function CoffeeCalendar({
           const dayKey = getLocalDayKey(date);
           const dayRecords = recordsByDay.get(dayKey) ?? [];
           const latest = dayRecords[0];
-          const hasCurrentSticker = Boolean(
-            latest?.stickerData &&
-            (latest.stickerVersion ?? 0) >= CURRENT_STICKER_VERSION
-          );
+          const visibleRecords = dayRecords
+            .filter(hasUsableStickerData)
+            .slice(0, 3)
+            .reverse();
 
           return (
             <button
@@ -103,20 +103,14 @@ export function CoffeeCalendar({
               <span className="coffee-calendar-number">{day}</span>
               {latest ? (
                 <>
-                  <span className="coffee-calendar-sticker-wrap">
-                    {hasCurrentSticker ? (
-                      <img className="coffee-calendar-sticker" src={latest.stickerData} alt="" />
-                    ) : latest.imageData ? (
-                      <img
-                        className="coffee-calendar-sticker coffee-calendar-photo-pending"
-                        src={latest.imageData}
-                        alt=""
-                      />
-                    ) : latest.stickerData ? (
-                      <img className="coffee-calendar-sticker" src={latest.stickerData} alt="" />
-                    ) : (
-                      <span className="coffee-calendar-sticker-pending" aria-hidden="true" />
-                    )}
+                  <span className="coffee-calendar-sticker-wrap" data-sticker-count={visibleRecords.length}>
+                    {visibleRecords.map((record) => {
+                      return (
+                        <span key={record.id} className="coffee-calendar-sticker-item">
+                          <img className="coffee-calendar-sticker" src={record.stickerData!} alt="" />
+                        </span>
+                      );
+                    })}
                   </span>
                   {dayRecords.length > 1 && <span className="coffee-calendar-count">{dayRecords.length}</span>}
                 </>
