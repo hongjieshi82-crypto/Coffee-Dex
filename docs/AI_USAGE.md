@@ -64,16 +64,10 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_VISION_MODEL=gpt-4o-mini
 ```
 
-README 示例中过：
-
-```bash
-OPENAI_VISION_MODEL=Qwen/Qwen3-VL-8B-Instruct
-```
-
 说明：
 
 - 只要服务提供 OpenAI-compatible Chat Completions，并支持 image_url 输入，就可以替换模型。
-- 模型名由环境变量控制。
+- 切换第三方兼容服务时，需要同时配置对应的 `OPENAI_BASE_URL` 和 `OPENAI_VISION_MODEL`。
 - API key 只在服务端使用。
 
 ### 3.4 Prompt
@@ -101,9 +95,11 @@ interface RecognitionResult {
   confidence: number;
   vessel: string | null;
   drinkType: string | null;
+  drinkName: string | null;
   reason: string;
   provider: "openai" | "manual";
   allowManualConfirm: boolean;
+  failureCode?: RecognitionFailureCode;
 }
 ```
 
@@ -115,6 +111,7 @@ interface RecognitionResult {
   "confidence": 0.86,
   "vessel": "纸杯",
   "drinkType": "咖啡",
+  "drinkName": "拿铁",
   "reason": "照片中有一杯咖啡饮品。",
   "provider": "openai",
   "allowManualConfirm": true
@@ -128,10 +125,12 @@ AI 识别不能成为录入流程的单点失败。
 以下情况都会降级到人工确认：
 
 - 未配置 `OPENAI_API_KEY`。
-- 模型接口超时。
+- 模型接口超时（默认单次 12 秒）。
 - 模型接口返回非 2xx。
 - JSON 解析失败或异常。
 - 网络错误。
+
+对于超时、限流、服务不可用、网络错误和异常返回等可恢复问题，服务端最多尝试 2 次；仍未完成识别时返回可人工确认的降级结果。
 
 降级返回：
 
@@ -141,9 +140,11 @@ AI 识别不能成为录入流程的单点失败。
   "confidence": 0,
   "vessel": null,
   "drinkType": null,
+  "drinkName": null,
   "reason": "AI 识别暂时不可用，已切换为人工确认。",
   "provider": "manual",
-  "allowManualConfirm": true
+  "allowManualConfirm": true,
+  "failureCode": "provider_unavailable"
 }
 ```
 
@@ -187,6 +188,7 @@ aiComments: Record<string, string>
 
 ```text
 coffee-data.ts
+toxic-quote-pool.ts
 ```
 
 字段：
@@ -199,11 +201,13 @@ toxicQuotes: string[]
 
 - 创建记录时按时间戳 seed 选取。
 - 每条记录保存一条 `toxicQuote`。
+- 结果卡支持“换一句”，更新后同步保存到当前记录。
 
 说明：
 
-- 当前 README 描述为 859 条职场毒鸡汤。
-- 也是静态文案库，不会运行时调用 AI。
+- 当前文案池共 3,127 条：`coffee-data.ts` 中 127 条人工整理文案，加上 `toxic-quote-pool.ts` 生成并校验的 3,000 条主题组合文案。
+- 生成器会校验总量与去重结果，避免文案池数量悄然变化或出现重复组合。
+- 这是静态文案库，不会在运行时调用 AI。
 
 ## 6. 开发过程中的 AI
 

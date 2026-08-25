@@ -4,40 +4,72 @@
 
 > 每一杯咖啡，都是你向生活妥协的证据。
 
+**在线体验：** [coffee-dex.vercel.app](https://coffee-dex.vercel.app)
+
 ---
 
 ## 关于
 
-Coffee-Dex 是一个游戏化的咖啡图鉴 Web 应用，专为打工人生存场景设计。
+Coffee-Dex 是一个面向打工人的游戏化咖啡记录与图鉴产品。手机端负责拍照、AI 饮品识别和快速录入，PC 端负责浏览日历、复盘数据和回看咖啡图鉴。
 
-记录你喝过的每一杯咖啡，收集 3127 条职场毒鸡汤语录，用毒舌 AI 评价你的咖啡选择。
+每次完成记录后，系统会从 3,127 条静态职场冷幽默文案中选取一条作为即时反馈。运行时外部 AI 仅用于识别用户主动上传的饮品照片；毒鸡汤和“AI 风格评语”均来自本地静态内容库，不会实时调用模型生成。
 
 ## 功能
 
 **图鉴系统**
-- 8 大饮品分类，覆盖咖啡、奶茶、果茶和非咖啡替代饮
+- 8 大类、76 个饮品子类，覆盖咖啡、奶茶、果茶和非咖啡替代饮
 - 覆盖意式经典、奶咖甜咖、手冲精品、冷萃冰咖、特调创意、奶茶鲜奶、果茶清爽、非咖啡替代饮
-- 游戏化收集打卡，进度追踪
+- 以抠图贴纸、日历和数量角标呈现收集进度
+
+**AI 饮品识别**
+- 用户拍照或选图后，由视觉模型判断图片中是否包含饮品，并尽量给出中文饮品名称
+- 单次请求超时 12 秒，可恢复错误会自动重试 1 次
+- 未配置模型、超时、限流或解析失败时均可切换为人工确认，AI 不会卡住录入流程
 
 **毒鸡汤语录**
-- 3127 条职场反讽与冷幽默文案
-- 每一条都是对打工生活的灵魂拷问
-- 每次打开随机展示，绝不重复
+- 127 条人工整理文案 + 3,000 条按主题组合并通过数量、去重校验的文案，共 3,127 条
+- 创建记录时按 seed 选取并保存到记录中，结果卡支持“换一句”
+- 文案是静态内容库，不属于运行时生成式 AI 能力
+
+**固定风格评语**
+- 76 条与饮品子类对应的预设评语
+- 用于记录卡、详情页和报告展示
+- 同样为静态内容，不会调用外部模型
 
 **双端适配**
-- 手机端：拿铁暖光风格，玻璃拟态设计
-- PC 端：暗色霓虹风格，赛博朋克质感
+- 手机端：拍照 / 相册上传、识别确认、标签填写、结果卡反馈和月历回看
+- PC 端：咖啡因概览、月历图鉴、日期下钻、记录详情和扫码授权
+- 手机访问根路径会自动进入 `/mobile`
 
 **云端同步**
 - Supabase 后端（PostgreSQL + Auth）
-- 邮箱 + 密码登录
-- 手机 / PC 数据互通
+- 邮箱密码登录与邮箱验证码确认
+- PC 端生成 3 分钟有效的扫码授权，手机可免重复登录接入同一账号
+- 手机 / PC 数据互通；PC 端当前通过 1.5 秒轮询刷新记录
+- 未配置 Supabase 时自动使用本地测试模式
 
 ## 快速开始
 
-### 方式一：直接打开 HTML（旧版预览）
+### 方式一：在线体验
 
-最简单的方式，无需安装任何依赖：
+直接访问 [https://coffee-dex.vercel.app](https://coffee-dex.vercel.app)。
+
+### 方式二：运行 Next.js 版本（推荐）
+
+需要 Node.js 22 或兼容版本：
+
+```bash
+git clone https://github.com/hongjieshi82-crypto/Coffee-Dex.git
+cd Coffee-Dex
+npm install
+npm run dev
+```
+
+访问 `http://localhost:3000`。
+
+### 方式三：打开旧版 HTML 预览
+
+仓库仍保留早期独立 HTML 原型，仅用于查看历史版本，不代表当前线上功能：
 
 1. 克隆仓库
    ```bash
@@ -50,39 +82,25 @@ Coffee-Dex 是一个游戏化的咖啡图鉴 Web 应用，专为打工人生存�
    open coffee-dex.html
    ```
 
-### 方式二：运行 Next.js 版本（推荐）
-
-需要 Node.js 环境：
-
-```bash
-git clone https://github.com/hongjieshi82-crypto/Coffee-Dex.git
-cd Coffee-Dex
-npm install
-npm run dev
-```
-
-访问 `http://localhost:3000`
-
 ## 文件结构
 
 ```
 Coffee-Dex/
-├── coffee-dex.html              # 独立 HTML 版本（直接浏览器打开）
-├── coffee-dex-supabase-schema.sql  # Supabase 数据库结构
-├── app/                         # Next.js 组件
-│   ├── page.tsx                 # 主页面
-│   ├── layout.tsx               # 布局组件
-│   ├── globals.css              # 全局样式
-│   ├── CoffeeCard.tsx           # 咖啡卡片
-│   ├── CoffeeGallery.tsx        # 图鉴画廊
-│   ├── ConnectionPanel.tsx      # 连接面板
-│   ├── LoadingOverlay.tsx       # 加载遮罩
-│   └── StatusBar.tsx            # 状态栏
-├── mock-data.ts                 # 模拟数据
-├── utils.ts                     # 工具函数
-├── package.json                 # Next.js 依赖
-├── next.config.ts               # Next.js 配置
-├── tsconfig.json                # TypeScript 配置
+├── app/
+│   ├── page.tsx                     # PC 概览、日历与图鉴
+│   ├── mobile/page.tsx              # 手机拍照与录入流程
+│   ├── mobile/sticker-worker.ts     # 后台贴纸处理 Worker
+│   ├── api/recognize/route.ts       # AI 饮品识别与降级
+│   ├── api/records/route.ts         # 记录读取、创建与更新
+│   └── api/auth/qr/route.ts         # 3 分钟扫码授权
+├── coffee-data.ts                   # 饮品数据、76 条固定评语与人工文案
+├── toxic-quote-pool.ts              # 3,000 条质量校验主题文案生成器
+├── qr-auth.ts                       # 扫码票据签名与有效期校验
+├── supabase-*.ts                    # Supabase 登录与数据访问
+├── coffee-dex-supabase-schema.sql   # 数据库结构
+├── docs/                            # PRD、AI Usage 与 Agent 交接文档
+├── public/                          # PWA、品牌、模型和第三方许可资源
+├── coffee-dex.html                  # 早期独立 HTML 原型
 └── README.md
 ```
 
@@ -120,9 +138,11 @@ Coffee-Dex/
 
 ## 技术栈
 
-- **前端**：HTML5 + CSS3 + Vanilla JavaScript / Next.js 16 + TypeScript
-- **后端**：Supabase（PostgreSQL + Auth）
-- **样式**：玻璃拟态 + 响应式设计
+- **前端**：Next.js 16、React 19、TypeScript、Tailwind CSS、Framer Motion
+- **AI 识别**：OpenAI-compatible Chat Completions，多模态 `image_url` 输入
+- **后端**：Supabase（PostgreSQL、Auth、Storage、RLS）
+- **贴纸处理**：`@imgly/background-removal` + Web Worker
+- **PWA**：Web App Manifest + Service Worker
 
 ## 第三方许可
 
@@ -169,7 +189,8 @@ Coffee-Dex/
 ```bash
 OPENAI_API_KEY=你的 AI Key
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_VISION_MODEL=Qwen/Qwen3-VL-8B-Instruct
+OPENAI_VISION_MODEL=gpt-4o-mini
+OPENAI_RECOGNITION_TIMEOUT_MS=12000
 
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
