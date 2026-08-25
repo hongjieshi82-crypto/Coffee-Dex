@@ -4300,39 +4300,46 @@ body {
   transform: none !important;
 }
 
-.coffee-calendar-photo-stamp {
-  display: block;
-  width: min(78px, 78%);
-  aspect-ratio: 0.86;
-  padding: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  border-radius: 42% 35% 40% 32% / 32% 41% 34% 43%;
-  background: #fffaf1;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.34), 0 0 0 2px rgba(255, 255, 255, 0.72);
+.coffee-calendar-sticker-pending-card {
+  display: flex;
+  min-width: 50px;
+  min-height: 54px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px dashed rgba(217, 180, 119, 0.24);
+  border-radius: 14px;
+  color: rgba(225, 195, 156, 0.42);
+  background: rgba(195, 159, 118, 0.025);
 }
 
-.coffee-calendar-photo-stamp img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  object-fit: cover;
-  filter: saturate(0.88) contrast(1.04);
+.coffee-calendar-sticker-pending-card > span {
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(217, 180, 119, 0.48);
+  border-radius: 50% 50% 44% 56%;
 }
 
-.coffee-calendar-sticker-missing {
-  width: 20px;
-  height: 20px;
-  border: 1px dashed rgba(217, 180, 119, 0.34);
-  border-radius: 50%;
+.coffee-calendar-sticker-pending-card small {
+  font-size: 7px;
+  letter-spacing: 0.06em;
 }
 
-.coffee-calendar-compact .coffee-calendar-photo-stamp {
-  width: min(42px, 82%);
-  padding: 2px;
-  border-width: 1px;
-  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(255, 255, 255, 0.76);
+.coffee-calendar-compact .coffee-calendar-sticker-pending-card {
+  min-width: 32px;
+  min-height: 36px;
+  gap: 3px;
+  border-radius: 9px;
+}
+
+.coffee-calendar-compact .coffee-calendar-sticker-pending-card > span {
+  width: 9px;
+  height: 9px;
+}
+
+.coffee-calendar-compact .coffee-calendar-sticker-pending-card small {
+  font-size: 5px;
 }
 
 .coffee-calendar-day.has-record:hover .coffee-calendar-sticker-wrap[data-sticker-count="2"] .coffee-calendar-sticker-item:nth-child(1) {
