@@ -4146,6 +4146,8 @@ body {
 
 /* Calendar visual refresh — warm dark archive, larger sticker-led cells. */
 .coffee-calendar {
+  position: relative;
+  overflow: hidden;
   border-color: rgba(195, 159, 118, 0.24);
   border-radius: 26px;
   background:
@@ -4208,13 +4210,16 @@ body {
 }
 
 .coffee-calendar-grid {
+  position: relative;
+  overflow: visible;
   margin-top: 10px;
 }
 
 .coffee-calendar-day {
+  z-index: 1;
   min-height: 108px;
   padding: 9px 8px 6px;
-  overflow: hidden;
+  overflow: visible;
   border-color: rgba(201, 164, 119, 0.16);
   border-radius: 16px;
   background:
@@ -4224,6 +4229,7 @@ body {
 }
 
 .coffee-calendar-day.has-record {
+  z-index: 3;
   background:
     radial-gradient(circle at 50% 80%, rgba(195, 159, 118, 0.09), transparent 58%),
     linear-gradient(150deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
@@ -4231,6 +4237,7 @@ body {
 
 .coffee-calendar-day:hover,
 .coffee-calendar-day.has-record:hover {
+  z-index: 12;
   border-color: rgba(224, 189, 147, 0.58);
   background:
     radial-gradient(circle at 50% 78%, rgba(195, 159, 118, 0.16), transparent 60%),
@@ -4251,10 +4258,10 @@ body {
 }
 
 .coffee-calendar-sticker-wrap {
-  top: 18px;
-  right: 2px;
-  bottom: 0;
-  left: 2px;
+  top: 13px;
+  right: -12%;
+  bottom: -8%;
+  left: -12%;
 }
 
 .coffee-calendar-sticker-item {
@@ -4268,32 +4275,32 @@ body {
 }
 
 .coffee-calendar-sticker-wrap[data-sticker-count="1"] .coffee-calendar-sticker-item {
-  transform: rotate(-3deg);
+  transform: rotate(-3deg) scale(1.08);
 }
 
 .coffee-calendar-sticker-wrap[data-sticker-count="2"] .coffee-calendar-sticker-item:nth-child(1) {
   z-index: 1;
-  transform: translate(-20%, 5%) rotate(-9deg) scale(0.9);
+  transform: translate(-23%, 5%) rotate(-9deg) scale(1.02);
 }
 
 .coffee-calendar-sticker-wrap[data-sticker-count="2"] .coffee-calendar-sticker-item:nth-child(2) {
   z-index: 2;
-  transform: translate(20%, -2%) rotate(7deg) scale(0.92);
+  transform: translate(23%, -3%) rotate(7deg) scale(1.04);
 }
 
 .coffee-calendar-sticker-wrap[data-sticker-count="3"] .coffee-calendar-sticker-item:nth-child(1) {
   z-index: 1;
-  transform: translate(-28%, 9%) rotate(-11deg) scale(0.8);
+  transform: translate(-32%, 9%) rotate(-11deg) scale(0.9);
 }
 
 .coffee-calendar-sticker-wrap[data-sticker-count="3"] .coffee-calendar-sticker-item:nth-child(2) {
   z-index: 3;
-  transform: translate(0, -5%) rotate(-1deg) scale(0.84);
+  transform: translate(0, -6%) rotate(-1deg) scale(0.95);
 }
 
 .coffee-calendar-sticker-wrap[data-sticker-count="3"] .coffee-calendar-sticker-item:nth-child(3) {
   z-index: 2;
-  transform: translate(28%, 8%) rotate(10deg) scale(0.8);
+  transform: translate(32%, 8%) rotate(10deg) scale(0.9);
 }
 
 .coffee-calendar-sticker-item .coffee-calendar-sticker {
@@ -4343,24 +4350,24 @@ body {
 }
 
 .coffee-calendar-day.has-record:hover .coffee-calendar-sticker-wrap[data-sticker-count="2"] .coffee-calendar-sticker-item:nth-child(1) {
-  transform: translate(-23%, 4%) rotate(-11deg) scale(0.91);
+  transform: translate(-28%, 3%) rotate(-11deg) scale(1.04);
 }
 
 .coffee-calendar-day.has-record:hover .coffee-calendar-sticker-wrap[data-sticker-count="2"] .coffee-calendar-sticker-item:nth-child(2) {
-  transform: translate(23%, -4%) rotate(9deg) scale(0.93);
+  transform: translate(28%, -5%) rotate(9deg) scale(1.06);
 }
 
 .coffee-calendar-day.has-record:hover .coffee-calendar-sticker-wrap[data-sticker-count="3"] .coffee-calendar-sticker-item:nth-child(1) {
-  transform: translate(-32%, 8%) rotate(-13deg) scale(0.81);
+  transform: translate(-38%, 7%) rotate(-13deg) scale(0.92);
 }
 
 .coffee-calendar-day.has-record:hover .coffee-calendar-sticker-wrap[data-sticker-count="3"] .coffee-calendar-sticker-item:nth-child(3) {
-  transform: translate(32%, 7%) rotate(12deg) scale(0.81);
+  transform: translate(38%, 6%) rotate(12deg) scale(0.92);
 }
 
 .coffee-calendar-sticker {
-  width: min(94px, 100%);
-  height: min(94px, 100%);
+  width: min(112px, 118%);
+  height: min(112px, 118%);
   filter: drop-shadow(0 7px 7px rgba(0, 0, 0, 0.42));
 }
 
@@ -4440,15 +4447,15 @@ body {
 }
 
 .coffee-calendar-compact .coffee-calendar-sticker-wrap {
-  top: 14px;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  top: 11px;
+  right: -15%;
+  bottom: -9%;
+  left: -15%;
 }
 
 .coffee-calendar-compact .coffee-calendar-sticker {
-  width: min(52px, 112%);
-  height: min(52px, 112%);
+  width: min(60px, 132%);
+  height: min(60px, 132%);
   filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.4));
 }
 
@@ -4487,8 +4494,8 @@ body {
 }
 
 .pc-overview-page .coffee-calendar-sticker {
-  width: min(92px, 104%);
-  height: min(92px, 104%);
+  width: min(116px, 120%);
+  height: min(116px, 120%);
 }
 
 @media (max-width: 340px) {
@@ -4508,7 +4515,7 @@ body {
   }
 
   .coffee-calendar-compact .coffee-calendar-sticker {
-    width: min(42px, 108%);
-    height: min(42px, 108%);
+    width: min(50px, 124%);
+    height: min(50px, 124%);
   }
 }
