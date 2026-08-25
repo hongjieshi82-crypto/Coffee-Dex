@@ -190,22 +190,13 @@ function preemptBackgroundJob() {
 }
 
 async function generateSticker(imageData: string): Promise<StickerGenerationResult> {
-  if (!canUseStickerWorker()) return terminalFailure();
-
   let blob: Blob;
 
   try {
-    blob = await removeBackgroundInWorker(imageData);
+    blob = await removeBackgroundCompat(imageData);
   } catch (error) {
-    const incompatible = stickerWorkerUnavailable || isWorkerCompatibilityError(error);
-
-    if (incompatible) {
-      stickerWorkerUnavailable = true;
-    }
-    disposeStickerWorker(error instanceof Error ? error : new Error(String(error)));
-
     console.warn("[Coffee-Dex] Sticker background removal failed:", error);
-    return incompatible ? terminalFailure() : retryableFailure();
+    return retryableFailure();
   }
 
   try {
@@ -217,20 +208,52 @@ async function generateSticker(imageData: string): Promise<StickerGenerationResu
 }
 
 async function preloadEngine() {
-  if (!canUseStickerWorker()) return;
-
-  try {
-    await requestStickerWorker({
-      type: "preload",
-      publicPath: getStickerPublicPath(),
-    });
-  } catch (error) {
-    if (stickerWorkerUnavailable || isWorkerCompatibilityError(error)) {
-      stickerWorkerUnavailable = true;
+  if (canUseStickerWorker()) {
+    try {
+      await requestStickerWorker({
+        type: "preload",
+        publicPath: getStickerPublicPath(),
+      });
+      return;
+    } catch (error) {
+      if (stickerWorkerUnavailable || isWorkerCompatibilityError(error)) {
+        stickerWorkerUnavailable = true;
+      }
+      disposeStickerWorker(error instanceof Error ? error : new Error(String(error)));
     }
-    disposeStickerWorker(error instanceof Error ? error : new Error(String(error)));
-    throw error;
   }
+
+  const { preload } = await import("@imgly/background-removal");
+  await preload(getMainThreadStickerConfig());
+}
+
+async function removeBackgroundCompat(imageData: string) {
+  if (canUseStickerWorker()) {
+    try {
+      return await removeBackgroundInWorker(imageData);
+    } catch (error) {
+      if (stickerWorkerUnavailable || isWorkerCompatibilityError(error)) {
+        stickerWorkerUnavailable = true;
+      }
+      disposeStickerWorker(error instanceof Error ? error : new Error(String(error)));
+      console.warn("[Coffee-Dex] Sticker worker unavailable, falling back to main thread:", error);
+    }
+  }
+
+  const { removeBackground } = await import("@imgly/background-removal");
+  return removeBackground(imageData, getMainThreadStickerConfig());
+}
+
+function getMainThreadStickerConfig() {
+  return {
+    model: "isnet_quint8" as const,
+    device: "cpu" as const,
+    rescale: true,
+    proxyToWorker: false,
+    publicPath: getStickerPublicPath(),
+    fetchArgs: { cache: "force-cache" as RequestCache },
+    output: { format: "image/png" as const },
+  };
 }
 
 async function removeBackgroundInWorker(imageData: string) {
@@ -329,10 +352,6 @@ function wait(durationMs: number) {
 
 function retryableFailure(): StickerGenerationResult {
   return { sticker: null, retryable: true };
-}
-
-function terminalFailure(): StickerGenerationResult {
-  return { sticker: null, retryable: false };
 }
 
 async function renderSticker(blob: Blob): Promise<string> {

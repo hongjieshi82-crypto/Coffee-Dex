@@ -111,6 +111,12 @@ export function CoffeeCalendar({
                         </span>
                       );
                     })}
+                    {visibleRecords.length === 0 && (
+                      <span className="coffee-calendar-sticker-processing" role="status">
+                        <span aria-hidden="true" />
+                        <small>贴纸处理中</small>
+                      </span>
+                    )}
                   </span>
                   {dayRecords.length > 1 && <span className="coffee-calendar-count">{dayRecords.length}</span>}
                 </>
