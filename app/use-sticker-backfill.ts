@@ -7,6 +7,7 @@ import {
   hasUsableCurrentSticker,
 } from "@/coffee-data";
 import {
+  canGenerateStickerInBackground,
   createSticker,
   isStickerQueueIdle,
   resetStickerEngine,
@@ -68,7 +69,12 @@ export function useStickerBackfill({
   }, [activeOwner]);
 
   useEffect(() => {
-    if (!enabled || !activeOwner || !recordsReady) return;
+    if (
+      !enabled ||
+      !activeOwner ||
+      !recordsReady ||
+      !canGenerateStickerInBackground()
+    ) return;
 
     let disposed = false;
     let timer: number | null = null;

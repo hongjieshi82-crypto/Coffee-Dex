@@ -86,10 +86,7 @@ export function CoffeeCalendar({
           const dayKey = getLocalDayKey(date);
           const dayRecords = recordsByDay.get(dayKey) ?? [];
           const latest = dayRecords[0];
-          const visibleRecords = dayRecords
-            .filter(hasUsableStickerData)
-            .slice(0, 3)
-            .reverse();
+          const visibleRecords = dayRecords.slice(0, 3).reverse();
 
           return (
             <button
@@ -107,16 +104,18 @@ export function CoffeeCalendar({
                     {visibleRecords.map((record) => {
                       return (
                         <span key={record.id} className="coffee-calendar-sticker-item">
-                          <img className="coffee-calendar-sticker" src={record.stickerData!} alt="" />
+                          {hasUsableStickerData(record) ? (
+                            <img className="coffee-calendar-sticker" src={record.stickerData!} alt="" />
+                          ) : record.imageData ? (
+                            <span className="coffee-calendar-photo-stamp">
+                              <img src={record.imageData} alt="" />
+                            </span>
+                          ) : (
+                            <span className="coffee-calendar-sticker-missing" aria-hidden="true" />
+                          )}
                         </span>
                       );
                     })}
-                    {visibleRecords.length === 0 && (
-                      <span className="coffee-calendar-sticker-processing" role="status">
-                        <span aria-hidden="true" />
-                        <small>贴纸处理中</small>
-                      </span>
-                    )}
                   </span>
                   {dayRecords.length > 1 && <span className="coffee-calendar-count">{dayRecords.length}</span>}
                 </>
