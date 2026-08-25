@@ -36,10 +36,13 @@ export interface CoffeeRecord {
 }
 
 export function hasUsableStickerData(record: CoffeeRecord) {
-  return Boolean(
-    record.stickerData?.startsWith("data:image/png;base64,") &&
-    record.stickerData.length >= MIN_USABLE_STICKER_DATA_URL_LENGTH
-  );
+  const stickerData = record.stickerData;
+  if (!stickerData) return false;
+
+  if (/^https:\/\//i.test(stickerData)) return true;
+
+  return stickerData.startsWith("data:image/png;base64,") &&
+    stickerData.length >= MIN_USABLE_STICKER_DATA_URL_LENGTH;
 }
 
 export function hasUsableCurrentSticker(record: CoffeeRecord) {
