@@ -9,6 +9,7 @@ const lanIps = Object.values(os.networkInterfaces()).flatMap((addresses) =>
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@imgly/background-removal-node", "onnxruntime-node", "sharp"],
   allowedDevOrigins: ["127.0.0.1", ...lanIps],
   async headers() {
     return [

@@ -106,12 +106,11 @@ export function CoffeeCalendar({
                         <span key={record.id} className="coffee-calendar-sticker-item">
                           {hasUsableStickerData(record) ? (
                             <img className="coffee-calendar-sticker" src={record.stickerData!} alt="" />
-                          ) : record.imageData ? (
-                            <span className="coffee-calendar-photo-stamp">
-                              <img src={record.imageData} alt="" />
-                            </span>
                           ) : (
-                            <span className="coffee-calendar-sticker-missing" aria-hidden="true" />
+                            <span className="coffee-calendar-sticker-pending-card" aria-label="贴纸待生成">
+                              <span aria-hidden="true" />
+                              <small>待生成</small>
+                            </span>
                           )}
                         </span>
                       );

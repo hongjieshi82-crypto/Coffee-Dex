@@ -6,12 +6,6 @@ import {
   CURRENT_STICKER_VERSION,
   hasUsableCurrentSticker,
 } from "@/coffee-data";
-import {
-  canGenerateStickerInBackground,
-  createSticker,
-  isStickerQueueIdle,
-  resetStickerEngine,
-} from "@/app/mobile/sticker";
 
 const IDLE_RECHECK_MS = 3_000;
 const EMPTY_RECHECK_MS = 10_000;
@@ -65,16 +59,10 @@ export function useStickerBackfill({
 
   useEffect(() => {
     retryStateRef.current.clear();
-    resetStickerEngine();
   }, [activeOwner]);
 
   useEffect(() => {
-    if (
-      !enabled ||
-      !activeOwner ||
-      !recordsReady ||
-      !canGenerateStickerInBackground()
-    ) return;
+    if (!enabled || !activeOwner || !recordsReady) return;
 
     let disposed = false;
     let timer: number | null = null;
@@ -89,7 +77,7 @@ export function useStickerBackfill({
       timer = null;
       if (disposed || activeOwnerRef.current !== activeOwner) return;
 
-      if (inFlightRef.current || !isStickerQueueIdle()) {
+      if (inFlightRef.current) {
         schedule(IDLE_RECHECK_MS);
         return;
       }
@@ -108,29 +96,13 @@ export function useStickerBackfill({
       inFlightRef.current = true;
 
       try {
-        const generation = await createSticker(candidate.imageData, "background");
-        if (activeOwnerRef.current !== activeOwner) return;
-
-        if (!generation.sticker) {
-          if (generation.retryable) {
-            markFailure(retryStateRef.current, candidate.id);
-          } else {
-            suppressForSession(retryStateRef.current, candidate.id);
-          }
-          return;
-        }
-
         const headers = await getAuthHeadersRef.current();
         if (activeOwnerRef.current !== activeOwner) return;
 
-        const response = await fetch("/api/records", {
-          method: "PATCH",
+        const response = await fetch("/api/stickers", {
+          method: "POST",
           headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify({
-            id: candidate.id,
-            stickerData: generation.sticker,
-            stickerVersion: CURRENT_STICKER_VERSION,
-          }),
+          body: JSON.stringify({ id: candidate.id }),
         });
 
         if (activeOwnerRef.current !== activeOwner) return;
@@ -194,8 +166,4 @@ function markFailure(retryStates: Map<string, RetryState>, recordId: string) {
   const attempts = (retryStates.get(recordId)?.attempts ?? 0) + 1;
   const delay = RETRY_DELAYS_MS[Math.min(attempts - 1, RETRY_DELAYS_MS.length - 1)];
   retryStates.set(recordId, { attempts, retryAt: Date.now() + delay });
-}
-
-function suppressForSession(retryStates: Map<string, RetryState>, recordId: string) {
-  retryStates.set(recordId, { attempts: 1, retryAt: Number.POSITIVE_INFINITY });
 }
