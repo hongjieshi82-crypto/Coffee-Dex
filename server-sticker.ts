@@ -6,10 +6,12 @@ const OUTLINE_RADIUS = 14;
 const OUTPUT_PADDING = 5;
 const CORE_ALPHA = 48;
 const VISIBLE_ALPHA = 20;
+const MODEL_PUBLIC_PATH = "https://cdn.jsdelivr.net/npm/@imgly/background-removal-node@1.4.5/dist/";
 
 export async function createServerSticker(imageSource: string) {
   const source = await loadImageSource(imageSource);
   const removed = await removeBackground(source, {
+    publicPath: MODEL_PUBLIC_PATH,
     model: "small",
     output: {
       format: "image/png",
