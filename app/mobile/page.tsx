@@ -18,6 +18,10 @@ import { BrandLogo } from "@/app/BrandLogo";
 import { CoffeeCalendar, getLocalDayKey } from "@/app/CoffeeCalendar";
 import { useStickerBackfill } from "@/app/use-sticker-backfill";
 import { useCoffeeAuth } from "@/use-coffee-auth";
+import {
+  createSticker,
+  preloadStickerEngine,
+} from "./sticker";
 
 const tempOptions = ["热", "冰", "常温"];
 const sugarOptions = ["无糖", "微甜", "标准", "很甜"];
@@ -270,6 +274,7 @@ export default function MobilePage() {
       setLastRecord(null);
       setShowResultCard(false);
       void recognizeImage(compressed);
+      void preloadStickerEngine();
     } catch {
       if (requestId === photoRequestRef.current) {
         setMessage("照片读取失败，请重新选择。");
@@ -415,18 +420,27 @@ export default function MobilePage() {
 
   const attachStickerToRecord = useCallback(async (
     recordId: string,
+    photoData: string,
     recordsOwner: string | null
   ) => {
     try {
       if (activeRecordsOwnerRef.current !== recordsOwner) return;
 
+      const generation = await createSticker(photoData);
+      if (!generation.sticker) return;
+      if (activeRecordsOwnerRef.current !== recordsOwner) return;
+
       const authHeaders = await getAuthHeaders();
       if (activeRecordsOwnerRef.current !== recordsOwner) return;
 
-      const response = await fetch("/api/stickers", {
-        method: "POST",
+      const response = await fetch("/api/records", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ id: recordId }),
+        body: JSON.stringify({
+          id: recordId,
+          stickerData: generation.sticker,
+          stickerVersion: CURRENT_STICKER_VERSION,
+        }),
       });
 
       if (!response.ok) return;
@@ -536,7 +550,7 @@ export default function MobilePage() {
       setShowResultCard(true);
       setMessage("");
       window.setTimeout(() => {
-        void attachStickerToRecord(data.record.id, recordsOwner);
+        void attachStickerToRecord(data.record.id, photoData, recordsOwner);
       }, NEW_RECORD_STICKER_DELAY_MS);
     } catch {
       setMessage("网络异常，提交失败，请重试。");

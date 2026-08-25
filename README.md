@@ -141,12 +141,12 @@ Coffee-Dex/
 - **前端**：Next.js 16、React 19、TypeScript、Tailwind CSS、Framer Motion
 - **AI 识别**：OpenAI-compatible Chat Completions，多模态 `image_url` 输入
 - **后端**：Supabase（PostgreSQL、Auth、Storage、RLS）
-- **贴纸处理**：服务端 `@imgly/background-removal-node` 主体抠图、连通域清理与轮廓白边生成
+- **贴纸处理**：`@imgly/background-removal` + Web Worker
 - **PWA**：Web App Manifest + Service Worker
 
 ## 第三方许可
 
-贴纸抠图使用 `@imgly/background-removal@1.7.0` 与 `@imgly/background-removal-node@1.4.5`，两者均采用 GNU AGPL v3 许可。完整许可证、第三方依赖清单和上游源码地址随应用发布在 `public/legal/`，线上页脚也提供了访问入口。
+浏览器端贴纸抠图使用 `@imgly/background-removal@1.7.0`，该组件采用 GNU AGPL v3 许可。完整许可证、第三方依赖清单和上游源码地址随应用发布在 `public/legal/`，线上页脚也提供了访问入口。
 
 ## 数据库设置
 
