@@ -533,6 +533,9 @@ export default function Home() {
           <a className="mt-2 inline-block text-[10px] text-white/20 hover:text-white/40" href="/legal/third-party-notices.txt" target="_blank" rel="noreferrer">
             开源许可
           </a>
+          <a className="ml-3 mt-2 inline-block text-[10px] text-white/20 hover:text-white/40" href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
+            京ICP备2026046201号-1
+          </a>
         </footer>
           </div>
         </section>
