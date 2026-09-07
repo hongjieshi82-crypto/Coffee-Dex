@@ -1164,9 +1164,6 @@ function MobileHome({
           <a className="m-open-source-link" href="/legal/third-party-notices.txt" target="_blank" rel="noreferrer">
             开源许可
           </a>
-          <a className="m-open-source-link" href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
-            京ICP备2026046201号-1
-          </a>
         </div>
       </div>
       {selectedRecord && <MobileDetailPopup record={selectedRecord} onClose={() => setSelectedRecordId(null)} />}

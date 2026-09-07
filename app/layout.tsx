@@ -42,6 +42,11 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="antialiased min-h-screen">
         {children}
+        <footer className="px-4 py-4 text-center text-[11px] text-white/40">
+          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" className="hover:text-white/60">
+            京ICP备2026046201号-1
+          </a>
+        </footer>
         <PwaInstallPrompt />
       </body>
     </html>
