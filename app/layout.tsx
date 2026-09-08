@@ -42,9 +42,19 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="antialiased min-h-screen">
         {children}
-        <footer className="px-4 py-4 text-center text-[11px] text-white/40">
-          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" className="hover:text-white/60">
+        <footer className="flex flex-col items-center gap-1 px-4 py-4 text-center text-[10px] text-white/35 sm:flex-row sm:justify-center sm:gap-2">
+          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" className="transition hover:text-white/60">
             京ICP备2026046201号-1
+          </a>
+          <span className="hidden text-white/20 sm:inline" aria-hidden="true">|</span>
+          <a
+            href="https://beian.mps.gov.cn/#/query/webSearch?code=11011502040709"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 transition hover:text-white/60"
+          >
+            <img src="/gongan-beian.png" alt="" width="13" height="13" />
+            京公网安备11011502040709号
           </a>
         </footer>
         <PwaInstallPrompt />
